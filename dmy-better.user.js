@@ -1,12 +1,11 @@
 // ==UserScript==
 // @name         DMY Better
 // @namespace    local.copy-md
-// @version      0.7
+// @version      0.7.1
 // @description  代码源 newoj：解除复制限制、复制题面为 Markdown、保存题目（PDF + 附件）、保存整个比赛
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
-// @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js
-// @downloadURL  https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js
+// @supportURL   https://greasyfork.org/zh-CN/scripts/600021-dmy-better
 // @match        https://newoj.daimayuan.top/p/*
 // @match        https://newoj.daimayuan.top/contest/*
 // @grant        GM_setClipboard

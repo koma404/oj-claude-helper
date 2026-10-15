@@ -5,11 +5,11 @@
 | 脚本 | 作用 | 安装 |
 | --- | --- | --- |
 | [Contest → Claude 一键解题](#contest--claude-一键解题) | 在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页一键提取题面，发给 Claude | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js) |
-| [DMY Better](#dmy-better) | 代码源 newoj：解除复制限制、复制题面 Markdown、保存题目（PDF + 附件）、保存整个比赛 | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js) |
+| [DMY Better](#dmy-better) | 代码源 newoj：解除复制限制、复制题面 Markdown、保存题目（PDF + 附件）、保存整个比赛 | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/600021-dmy-better) · [GitHub](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js) |
 
 两个脚本互相独立，可以只装一个；在代码源上同时装效果最好：DMY Better 负责复制 Markdown 和下载，Contest → Claude 负责把题目发给 Claude（所以它在代码源上不再放自己的「复制 MD」按钮）。
 
-先在浏览器装 [Tampermonkey](https://www.tampermonkey.net/)（或 Violentmonkey），再点上表的「安装」链接，油猴会弹出安装页。两个脚本都会从本仓库自动更新（见下文「安装与自动更新」）。
+先在浏览器装 [Tampermonkey](https://www.tampermonkey.net/)（或 Violentmonkey），再点上表的「安装」链接，油猴会弹出安装页。Contest → Claude 从本仓库自动更新（见下文「安装与自动更新」），DMY Better 从你安装它的地方更新。
 
 ---
 
@@ -45,7 +45,7 @@
 
 打开 <https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js>，油猴会弹出安装页，点「安装」。
 
-这样装的脚本会自动跟 GitHub 同步：脚本头部的 `@updateURL` / `@downloadURL` 指向仓库默认分支上的这个文件，油猴定期检查，发现 `@version` 变大就自动更新（检查间隔在油猴「设置 → 脚本更新」里调，也可以在脚本列表里手动「检查更新」；GitHub 的文件有约 5 分钟缓存，推送后稍等再检查）。所以每次修改脚本都要把 `@version` 加一。菜单里的设置（项目链接、API Key、标签位置等）存在油猴存储里，更新不会丢；但直接在油猴编辑器里改的代码会被覆盖。DMY Better 同理。
+这样装的脚本会自动跟 GitHub 同步：脚本头部的 `@updateURL` / `@downloadURL` 指向仓库默认分支上的这个文件，油猴定期检查，发现 `@version` 变大就自动更新（检查间隔在油猴「设置 → 脚本更新」里调，也可以在脚本列表里手动「检查更新」；GitHub 的文件有约 5 分钟缓存，推送后稍等再检查）。所以每次修改脚本都要把 `@version` 加一。菜单里的设置（项目链接、API Key、标签位置等）存在油猴存储里，更新不会丢；但直接在油猴编辑器里改的代码会被覆盖。
 
 ### 两种模式（在油猴菜单里切换）
 
@@ -69,7 +69,12 @@
 
 ## DMY Better
 
-代码源 newoj（`newoj.daimayuan.top`）增强脚本。[安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js)
+代码源 newoj（`newoj.daimayuan.top`）增强脚本。发布在 [Greasy Fork](https://greasyfork.org/zh-CN/scripts/600021-dmy-better)，源码在本仓库。
+
+两种安装方式都行，脚本没有写死更新地址，油猴会从你安装时的地址检查更新：
+
+- **从 Greasy Fork 安装**（推荐，国内访问更稳）：从 Greasy Fork 更新。
+- **从 GitHub 安装**：打开 <https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js>，之后从 GitHub 更新。
 
 - **解除复制限制**：页面禁止选中、复制、右键的限制全部去掉。
 - **复制 MD**：题目页左下角按钮，把题面（含 KaTeX 公式、样例、表格、图片）复制为 Markdown。
