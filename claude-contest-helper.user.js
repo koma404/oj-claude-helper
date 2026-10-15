@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Contest → Claude 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      0.7.0
+// @version      1.0.0
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页面一键提取题面，发送给 Claude（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
@@ -144,9 +144,15 @@
         box-shadow:0 2px 10px rgba(0,0,0,.25); transform:translateX(calc(100% - 34px)); transition:transform .2s ease; }
       #cc-edge-tab.cc-left { right:auto; left:0; flex-direction:row-reverse; padding:0 0 0 4px;
         border-radius:0 999px 999px 0; transform:translateX(calc(-100% + 34px)); }
-      #cc-edge-tab.cc-open, #cc-edge-tab.cc-dragging { transform:translateX(0); }
+      #cc-edge-tab.cc-open { transform:translateX(0); }
       #cc-edge-tab .cc-handle:hover { background:rgba(0,0,0,.12); border-radius:999px; }
-      #cc-edge-tab.cc-dragging { transition:none; }
+      /* 拖动时变成跟随鼠标的小球，松手后吸附到最近的左右边缘 */
+      #cc-edge-tab.cc-ball { right:auto; width:40px; height:40px; padding:0; justify-content:center; border-radius:50%;
+        transform:none; transition:none; box-shadow:0 0 0 3px #fff, 0 4px 14px rgba(0,0,0,.3); }
+      #cc-edge-tab.cc-ball button { display:none; }
+      #cc-edge-tab.cc-ball .cc-handle { width:40px; height:40px; background:none; }
+      #cc-edge-tab.cc-ball .cc-icon { width:20px; height:20px; }
+      #cc-edge-tab.cc-snapping { transition:left .22s cubic-bezier(.3,1.4,.6,1), top .22s ease; }
       #cc-edge-tab .cc-handle { display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex:none; cursor:grab; }
       #cc-edge-tab.cc-dragging, #cc-edge-tab.cc-dragging * { cursor:grabbing; }
       #cc-edge-tab .cc-icon { width:16px; height:16px; }
@@ -206,27 +212,43 @@
   }
 
   function makeDraggable(tab) {
+    const BALL = 40;
     let justDragged = false;
     tab.addEventListener('pointerdown', (e) => {
-      if (e.button !== 0) return;
-      const start = { x: e.clientX, y: e.clientY, offset: e.clientY - tab.getBoundingClientRect().top };
-      let pos = null;
+      if (e.button !== 0 || tab.classList.contains('cc-snapping')) return;
+      const start = { x: e.clientX, y: e.clientY };
+      let dragging = false;
+      const clamp = (v, max) => Math.min(max, Math.max(4, v));
       // 监听 window 而不是标签本身：鼠标移动很快时会离开标签；也不用 setPointerCapture，否则按钮收不到 click
       const move = (ev) => {
-        if (!pos && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 5) return;
-        tab.classList.add('cc-dragging');
-        pos = { side: ev.clientX < window.innerWidth / 2 ? 'left' : 'right', top: (ev.clientY - start.offset) / window.innerHeight };
-        placeEdgeTab(tab, pos);
+        if (!dragging && Math.hypot(ev.clientX - start.x, ev.clientY - start.y) < 5) return;
+        if (!dragging) {
+          dragging = true;
+          tab.classList.remove('cc-open', 'cc-left');
+          tab.classList.add('cc-ball', 'cc-dragging');
+        }
+        tab.style.left = clamp(ev.clientX - BALL / 2, window.innerWidth - BALL - 4) + 'px';
+        tab.style.top = clamp(ev.clientY - BALL / 2, window.innerHeight - BALL - 4) + 'px';
       };
       const end = () => {
         window.removeEventListener('pointermove', move);
         window.removeEventListener('pointerup', end);
         window.removeEventListener('pointercancel', end);
-        tab.classList.remove('cc-dragging');
-        if (!pos) return;
-        GM_setValue('tabPos', { side: pos.side, top: parseFloat(tab.style.top) / window.innerHeight });
+        if (!dragging) return;
         justDragged = true;
         setTimeout(() => { justDragged = false; }, 0);
+        // 吸附：小球先滑到最近的边缘，动画结束后变回贴边的标签
+        const side = parseFloat(tab.style.left) + BALL / 2 < window.innerWidth / 2 ? 'left' : 'right';
+        const top = parseFloat(tab.style.top);
+        tab.classList.add('cc-snapping');
+        tab.style.left = (side === 'left' ? 0 : window.innerWidth - BALL) + 'px';
+        setTimeout(() => {
+          tab.classList.remove('cc-ball', 'cc-dragging', 'cc-snapping');
+          tab.style.left = '';
+          const pos = { side, top: (top + BALL / 2 - tab.offsetHeight / 2) / window.innerHeight };
+          placeEdgeTab(tab, pos);
+          GM_setValue('tabPos', { side, top: parseFloat(tab.style.top) / window.innerHeight });
+        }, 240);
       };
       window.addEventListener('pointermove', move);
       window.addEventListener('pointerup', end);
