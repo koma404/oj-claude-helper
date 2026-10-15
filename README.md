@@ -1,8 +1,23 @@
-# Contest → Claude 一键解题（油猴脚本）
+# OJ Claude Helper
+
+算法竞赛 OJ 的油猴脚本合集：
+
+| 脚本 | 作用 | 安装 |
+| --- | --- | --- |
+| [Contest → Claude 一键解题](#contest--claude-一键解题) | 在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页一键提取题面，发给 Claude | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js) |
+| [DMY Better](#dmy-better) | 代码源 newoj：解除复制限制、复制题面 Markdown、保存题目（PDF + 附件）、保存整个比赛 | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js) |
+
+两个脚本互相独立，可以只装一个；在代码源上同时装效果最好：DMY Better 负责复制 Markdown 和下载，Contest → Claude 负责把题目发给 Claude（所以它在代码源上不再放自己的「复制 MD」按钮）。
+
+先在浏览器装 [Tampermonkey](https://www.tampermonkey.net/)（或 Violentmonkey），再点上表的「安装」链接，油猴会弹出安装页。两个脚本都会从本仓库自动更新（见下文「安装与自动更新」）。
+
+---
+
+## Contest → Claude 一键解题
 
 在算法竞赛**题目页面**加两个按钮：**问 Claude**（`Alt+Shift+C`）一键提取题面发给 Claude，**复制 MD**（`Alt+Shift+M`）复制题目 Markdown。只发送题目本身（标题、链接、题面），不附加提示词，提示词交给 Claude 项目的自定义指令。
 
-## 支持的网站
+### 支持的网站
 
 | 网站 | 提取方式 |
 | --- | --- |
@@ -26,27 +41,40 @@
 
 其它网站：在脚本头部加一行 `// @match`，然后**选中题目文字**再点按钮即可（有选中文字时只发送选中部分）。
 
-## 安装
+### 安装与自动更新
 
-1. 浏览器装 [Tampermonkey](https://www.tampermonkey.net/)（或 Violentmonkey）。
-2. 打开 <https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js>，油猴会弹出安装页，点「安装」。
+打开 <https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js>，油猴会弹出安装页，点「安装」。
 
-这样装的脚本会自动跟 GitHub 同步：脚本头部的 `@updateURL` / `@downloadURL` 指向仓库默认分支上的这个文件，油猴定期检查，发现 `@version` 变大就自动更新（检查间隔在油猴「设置 → 脚本更新」里调，也可以在脚本列表里手动「检查更新」）。所以每次修改脚本都要把 `@version` 加一。菜单里的设置（项目链接、API Key、标签位置等）存在油猴存储里，更新不会丢；但直接在油猴编辑器里改的代码会被覆盖。
+这样装的脚本会自动跟 GitHub 同步：脚本头部的 `@updateURL` / `@downloadURL` 指向仓库默认分支上的这个文件，油猴定期检查，发现 `@version` 变大就自动更新（检查间隔在油猴「设置 → 脚本更新」里调，也可以在脚本列表里手动「检查更新」；GitHub 的文件有约 5 分钟缓存，推送后稍等再检查）。所以每次修改脚本都要把 `@version` 加一。菜单里的设置（项目链接、API Key、标签位置等）存在油猴存储里，更新不会丢；但直接在油猴编辑器里改的代码会被覆盖。DMY Better 同理。
 
-## 两种模式（在油猴菜单里切换）
+### 两种模式（在油猴菜单里切换）
 
 - **网页版（默认）**：打开你的 Claude 项目（菜单「Claude 项目」里设置，留空则用 `claude.ai/new`），在项目里新建对话，脚本把题面填进输入框，由你检查后自己按发送（菜单里可打开“自动发送”，但脚本代你点发送属于条款里的灰色地带，默认关闭）。用的是你自己的 claude.ai 账号，不需要 API Key。题面同时会复制到剪贴板，如果 claude.ai 改版导致自动填入失败，直接 `Ctrl+V` 即可。
 - **API**：菜单里设置 Anthropic API Key 后，直接在题目页面弹出面板显示回答，带“复制代码”按钮（复制最后一个代码块）。Key 只保存在油猴本地存储中。
 
 把项目的自定义指令和知识库（模板、常用算法等）配好，脚本只负责把题目送进去。
 
-洛谷和代码源页面自带「复制 Markdown」，所以悬浮标签上不放「复制 MD」按钮（`Alt+Shift+M` 仍可用）。
+洛谷页面自带「复制 Markdown」，代码源上由 [DMY Better](#dmy-better) 提供，所以这两个网站的悬浮标签上不放「复制 MD」按钮（`Alt+Shift+M` 仍可用）。
 
 其它菜单项：Vjudge 侧边栏按钮显示/隐藏、API 模型 ID、复制题目 Markdown、重置悬浮标签位置、调试信息。API 模式不经过项目，所以不会带上项目的自定义指令。
 
-## 注意
+### 注意
 
 - Vjudge 上只有 PDF 题面的题：「问 Claude」会把 PDF 下载下来，网页版作为附件上传到对话里，API 模式作为 document 发送；「复制 MD」只能复制标题和 PDF 链接。PDF 可能放在其它域名上，第一次下载时油猴可能会弹窗询问是否允许跨域访问，选允许即可。
 
 - **不要在正式比赛（rated contest）中使用。** Codeforces 等平台明确禁止比赛中使用 AI 解题，违规会被封号；请只在赛后补题、练习时使用。
 - 网页版模式依赖 claude.ai 的页面结构（`contenteditable` 输入框、`aria-label="Send message"` 的发送按钮），改版后可能需要调整 `runOnClaude()` 里的选择器。
+
+---
+
+## DMY Better
+
+代码源 newoj（`newoj.daimayuan.top`）增强脚本。[安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js)
+
+- **解除复制限制**：页面禁止选中、复制、右键的限制全部去掉。
+- **复制 MD**：题目页左下角按钮，把题面（含 KaTeX 公式、样例、表格、图片）复制为 Markdown。
+- **保存题目**：把当前题目渲染成 PDF，连同题目附件一起下载到以题目命名的文件夹。
+- **保存整个比赛**：在比赛页逐题加载并保存，按「比赛名/题号. 题名/」分文件夹。
+
+这三个功能也都在油猴菜单里。题面容器、标题、附件的选择器写在脚本开头的配置区，代码源改版时改那里即可。PDF 生成用到 html2canvas 和 jsPDF，通过 `@require` 从 cdnjs 加载；如果安装时提示库下载失败，可能是网络访问不了 cdnjs。
+
