@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Contest → Claude 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      1.0.0
+// @version      1.0.1
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页面一键提取题面，发送给 Claude（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
@@ -152,6 +152,7 @@
       #cc-edge-tab.cc-ball button { display:none; }
       #cc-edge-tab.cc-ball .cc-handle { width:40px; height:40px; background:none; }
       #cc-edge-tab.cc-ball .cc-icon { width:20px; height:20px; }
+      #cc-edge-tab.cc-notrans { transition:none !important; }
       #cc-edge-tab.cc-snapping { transition:left .22s cubic-bezier(.3,1.4,.6,1), top .22s ease; }
       #cc-edge-tab .cc-handle { display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex:none; cursor:grab; }
       #cc-edge-tab.cc-dragging, #cc-edge-tab.cc-dragging * { cursor:grabbing; }
@@ -237,17 +238,22 @@
         if (!dragging) return;
         justDragged = true;
         setTimeout(() => { justDragged = false; }, 0);
-        // 吸附：小球先滑到最近的边缘，动画结束后变回贴边的标签
+        // 吸附：小球先滑到最近的边缘（露出部分和收起的标签一样宽），动画结束后变回贴边的标签
         const side = parseFloat(tab.style.left) + BALL / 2 < window.innerWidth / 2 ? 'left' : 'right';
         const top = parseFloat(tab.style.top);
         tab.classList.add('cc-snapping');
-        tab.style.left = (side === 'left' ? 0 : window.innerWidth - BALL) + 'px';
+        const PEEK = 34; // 收起状态露出的宽度，和 CSS 里的 translateX(100% - 34px) 一致
+        tab.style.left = (side === 'left' ? PEEK - BALL : window.innerWidth - PEEK) + 'px';
         setTimeout(() => {
+          // 变回标签时关掉过渡动画，否则 transform 会从“展开”动画到“收起”，看起来闪一下
+          tab.classList.add('cc-notrans');
           tab.classList.remove('cc-ball', 'cc-dragging', 'cc-snapping');
           tab.style.left = '';
           const pos = { side, top: (top + BALL / 2 - tab.offsetHeight / 2) / window.innerHeight };
           placeEdgeTab(tab, pos);
           GM_setValue('tabPos', { side, top: parseFloat(tab.style.top) / window.innerHeight });
+          void tab.offsetWidth; // 先让无动画的样式生效
+          requestAnimationFrame(() => requestAnimationFrame(() => tab.classList.remove('cc-notrans')));
         }, 240);
       };
       window.addEventListener('pointermove', move);
