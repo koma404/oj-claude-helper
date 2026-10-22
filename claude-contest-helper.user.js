@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Contest → Claude 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      1.0.1
+// @version      1.0.2
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页面一键提取题面，发送给 Claude（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
@@ -46,12 +46,14 @@
     apiKey: '',              // api 模式需要
     model: 'claude-opus-5-5',
     // web 模式下打开的地址：填 Claude 项目链接则在该项目里新建对话；留空则用 https://claude.ai/new
-    projectUrl: 'https://claude.ai/project/01a11f70-bbd7-727e-9e27-93b81bc5d979',
+    projectUrl: 'https://claude.ai/project/01a16288-a5b3-710f-8a63-c585da9e1e13',
     maxTokens: 16000,
     tabPos: null,            // 悬浮标签位置（拖动后自动保存）
     vjudgeSidebar: true,     // Vjudge 左侧面板里是否显示按钮
   };
   const cfg = (k) => GM_getValue(k, DEFAULTS[k]);
+  // 项目换过地址：菜单里保存的还是旧项目时，自动换成新项目
+  if (GM_getValue('projectUrl') === 'https://claude.ai/project/01a11f70-bbd7-727e-9e27-93b81bc5d979') GM_setValue('projectUrl', DEFAULTS.projectUrl);
   const PENDING_KEY = 'pendingPrompt';
   const PENDING_TTL = 2 * 60 * 1000;
 
