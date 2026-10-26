@@ -1,11 +1,11 @@
 # OJ Claude Helper
 
-算法竞赛 OJ 的油猴脚本合集：
+算法竞赛 OJ 的油猴脚本。本仓库是 Contest → Claude，配套的 DMY Better 在单独的仓库 [koma404/DMY-Better](https://github.com/koma404/DMY-Better)。
 
 | 脚本 | 作用 | 安装 |
 | --- | --- | --- |
 | [Contest → Claude 一键解题](#contest--claude-一键解题) | 在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页一键提取题面，发给 Claude | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js) |
-| [DMY Better](#dmy-better) | 代码源 newoj：解除复制限制、复制题面 Markdown、保存题目（PDF + 附件）、保存整个比赛 | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/600021-dmy-better) · [GitHub](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js) |
+| [DMY Better](https://github.com/koma404/DMY-Better) | 代码源 newoj：解除复制限制、复制题面 Markdown、保存题目（PDF + 附件）、保存整个比赛 | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/600021-dmy-better) · [GitHub](https://github.com/koma404/DMY-Better) |
 
 两个脚本互相独立，可以只装一个；在代码源上同时装效果最好：DMY Better 负责复制 Markdown 和下载，Contest → Claude 负责把题目发给 Claude（所以它在代码源上不再放自己的「复制 MD」按钮）。
 
@@ -54,7 +54,7 @@
 
 把项目的自定义指令和知识库（模板、常用算法等）配好，脚本只负责把题目送进去。
 
-洛谷页面自带「复制 Markdown」，代码源上由 [DMY Better](#dmy-better) 提供，所以这两个网站的悬浮标签上不放「复制 MD」按钮（`Alt+Shift+M` 仍可用）。
+洛谷页面自带「复制 Markdown」，代码源上由 [DMY Better](https://github.com/koma404/DMY-Better) 提供，所以这两个网站的悬浮标签上不放「复制 MD」按钮（`Alt+Shift+M` 仍可用）。
 
 其它菜单项：Vjudge 侧边栏按钮显示/隐藏、API 模型 ID、复制题目 Markdown、重置悬浮标签位置、调试信息。API 模式不经过项目，所以不会带上项目的自定义指令。
 
@@ -64,22 +64,3 @@
 
 - **不要在正式比赛（rated contest）中使用。** Codeforces 等平台明确禁止比赛中使用 AI 解题，违规会被封号；请只在赛后补题、练习时使用。
 - 网页版模式依赖 claude.ai 的页面结构（`contenteditable` 输入框、`aria-label="Send message"` 的发送按钮），改版后可能需要调整 `runOnClaude()` 里的选择器。
-
----
-
-## DMY Better
-
-代码源 newoj（`newoj.daimayuan.top`）增强脚本。发布在 [Greasy Fork](https://greasyfork.org/zh-CN/scripts/600021-dmy-better)，源码在本仓库。
-
-两种安装方式都行，脚本没有写死更新地址，油猴会从你安装时的地址检查更新：
-
-- **从 Greasy Fork 安装**（推荐，国内访问更稳）：从 Greasy Fork 更新。
-- **从 GitHub 安装**：打开 <https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/dmy-better.user.js>，之后从 GitHub 更新。
-
-- **解除复制限制**：页面禁止选中、复制、右键的限制全部去掉。
-- **复制 MD**：题目页左下角按钮，把题面（含 KaTeX 公式、样例、表格、图片）复制为 Markdown。
-- **保存题目**：把当前题目渲染成 PDF，连同题目附件一起下载到以题目命名的文件夹。
-- **保存整个比赛**：在比赛页逐题加载并保存，按「比赛名/题号. 题名/」分文件夹。
-
-这三个功能也都在油猴菜单里。题面容器、标题、附件的选择器写在脚本开头的配置区，代码源改版时改那里即可。PDF 生成用到 html2canvas 和 jsPDF，通过 `@require` 从 cdnjs 加载；如果安装时提示库下载失败，可能是网络访问不了 cdnjs。
-
