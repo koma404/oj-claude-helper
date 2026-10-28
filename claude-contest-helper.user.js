@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Contest → Claude 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      1.1.0
+// @version      1.1.1
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
@@ -525,13 +525,14 @@
     return null;
   }
 
-  // 代码源旧 OJ（UOJ 系统）：题面在 .uoj-article 里，公式是 MathJax，标题形如「A. 逆序对」或「#3259. 逆序对」
+  // 代码源旧 OJ（UOJ 系统）：题面在 <article class="top-buffer-md">（有的版本是 .uoj-article）里，
+  // 公式是 MathJax，标题形如「A. 逆序对」或「#3259. 逆序对」
   function extractUoj() {
-    const el = document.querySelector('.uoj-article');
+    const el = document.querySelector('.uoj-article, article.top-buffer-md, #tab-statement article, article, .typo');
     if (!el) return null;
     const h = [...document.querySelectorAll('h1, h2')]
       .find((x) => /^\s*(#\d+|[A-Z]\d*)\s*[.．]\s*\S/.test(x.textContent));
-    const title = (h?.textContent || document.title.replace(/\s*-\s*Daimayuan Online Judge\s*$/i, ''))
+    const title = (h?.textContent || document.title.replace(/\s*-\s*Daimayuan Online Judge\s*$/i, '').split(' - ')[0])
       .replace(/\s+/g, ' ').trim();
     // 页面顶部的「时间限制:2 s」「空间限制:256 MB」小标签
     const limits = [...document.querySelectorAll('.label, .badge')]
