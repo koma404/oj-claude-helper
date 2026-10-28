@@ -4,7 +4,7 @@
 
 | 脚本 | 作用 | 安装 |
 | --- | --- | --- |
-| [Contest → Claude 一键解题](#contest--claude-一键解题) | 在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页一键提取题面，发给 Claude | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js) |
+| [Contest → Claude 一键解题](#contest--claude-一键解题) | 在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页一键提取题面，发给 Claude | [安装](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js) |
 | [DMY Better](https://github.com/koma404/DMY-Better) | 代码源 newoj：解除复制限制、复制题面 Markdown、保存题目（PDF + 附件）、保存整个比赛 | [Greasy Fork](https://greasyfork.org/zh-CN/scripts/600021-dmy-better) · [GitHub](https://github.com/koma404/DMY-Better) |
 
 两个脚本互相独立，可以只装一个；在代码源上同时装效果最好：DMY Better 负责复制 Markdown 和下载，Contest → Claude 负责把题目发给 Claude（所以它在代码源上不再放自己的「复制 MD」按钮）。
@@ -27,6 +27,7 @@
 | LeetCode / 力扣 | 题目描述区域 |
 | Vjudge | 比赛页 `#problem/X` 和单题页 `/problem/...`，从题面 iframe 对应的描述页提取，`$$$x$$$` 等 CF 原始公式写法统一成 `$x$`；只有 PDF 的题会下载 PDF 作为附件发给 Claude |
 | 代码源 newoj（Hydro） | 优先读 `UiContext.pdoc` 里的原始 Markdown，失败时读 `.problem-content` |
+| 代码源旧 OJ `oj.daimayuan.top`（UOJ） | `.uoj-article`，从 MathJax 的 `<script type="math/tex">` 还原公式，附带时空限制 |
 
 按钮位置：Vjudge 放在左侧面板里（PDF 按钮下面，可在油猴菜单「Vjudge 侧边栏按钮」里隐藏）；其它网站贴在屏幕边缘，平时只露出图标，点击图标展开 / 收起（点页面其它地方也会收起）；按住拖动时会变成一个跟随鼠标的小球，松手后吸附到最近的左右边缘，位置会记住（菜单「重置悬浮标签位置」可恢复）。
 
@@ -38,6 +39,7 @@
 - LeetCode：`/problems/<题目>/` 和 `/problems/<题目>/description/`
 - Vjudge：`/contest/<id>#problem/<题号>`、`/problem/<题目>`
 - 代码源 newoj：`/p/<题号>`
+- 代码源旧 OJ：`/problem/<题号>`、`/contest/<id>/problem/<题号>`
 
 其它网站：在脚本头部加一行 `// @match`，然后**选中题目文字**再点按钮即可（有选中文字时只发送选中部分）。
 
@@ -54,7 +56,7 @@
 
 把项目的自定义指令和知识库（模板、常用算法等）配好，脚本只负责把题目送进去。
 
-洛谷页面自带「复制 Markdown」，代码源上由 [DMY Better](https://github.com/koma404/DMY-Better) 提供，所以这两个网站的悬浮标签上不放「复制 MD」按钮（`Alt+Shift+M` 仍可用）。
+洛谷页面自带「复制 Markdown」，代码源（新旧 OJ）上由 [DMY Better](https://github.com/koma404/DMY-Better) 提供，所以这些网站的悬浮标签上不放「复制 MD」按钮（`Alt+Shift+M` 仍可用）。
 
 其它菜单项：Vjudge 侧边栏按钮显示/隐藏、API 模型 ID、复制题目 Markdown、重置悬浮标签位置、调试信息。API 模式不经过项目，所以不会带上项目的自定义指令。
 

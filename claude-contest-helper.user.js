@@ -1,8 +1,8 @@
 // ==UserScript==
 // @name         Contest → Claude 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      1.0.2
-// @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源 题目页面一键提取题面，发送给 Claude（网页版或 API）
+// @version      1.1.0
+// @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
 // @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js
@@ -16,6 +16,8 @@
 // @match        https://leetcode.cn/*
 // @match        https://vjudge.net/*
 // @match        https://newoj.daimayuan.top/*
+// @match        http://oj.daimayuan.top/*
+// @match        https://oj.daimayuan.top/*
 // @match        https://claude.ai/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -64,6 +66,8 @@
     { host: /^www\.luogu\.com\.cn$/, path: /^\/problem\/(?!list\/?$|solution\/)[\w-]+\/?$/ },
     { host: /^leetcode\.(com|cn)$/, path: /^\/problems\/[\w-]+(\/description)?\/?$/ },
     { host: /^newoj\.daimayuan\.top$/, path: /^(\/d\/[^/]+)?\/p\/[^/]+\/?$/ },
+    // 代码源旧 OJ（UOJ）：/problem/3259、/contest/431/problem/3259
+    { host: /^oj\.daimayuan\.top$/, path: /^\/(contest\/\d+\/)?problem\/\d+\/?$/ },
     { host: /^vjudge\.net$/, path: /^\/problem\/(?!description\/)[^/]+\/?$/ },
     { host: /^vjudge\.net$/, path: /^\/contest\/\d+\/?$/, hash: /^#problem\/\w+/ },
   ];
@@ -84,7 +88,7 @@
   // Claude 图标（白色透明底 PNG），用作 CSS mask，颜色跟随 currentColor
   const ICON_URL = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAEAAAABACAQAAAAAYLlVAAALGUlEQVR42p2Ze4xc1X3HP/fe2V2vX2AbbIwKJjWYNpF5FJQgCGASlJaQQFqM0sRVG6ANTYgaRaQllRqJVChWFKqSAAklEAUpUWRRIoJK06TQlrQ8XdlpEtsxD9sB2zv78s7uzuzOzJ17P/1jjsezs7OzOOdK87iP8/vd7/me8/v+fieSHi0iYg2fYwOvsp8dSET3B2Ly8ETPDrs0Fz4iY/ERddpUvTec6XYnXuMjXh1+n8TR62Is/pl1hxy26KgVLwpn55v/jDVVb+h6x2/kQCyu8VdOOeKYYxZNvV9Muphfb9G649Y94NqTQyHuMTYwwwRJ+J9Q4XrWkxPNuS8BbmItFfpJWcWp0HFHz9bLgYRZdtMfaBUxyzv4xDync+ACIiJkCUcYCs63U7lAgb7Wq7xNB5rtp8ShO0lo8KesnINBRE7MpjAPYl5juvUErXnRoEFK1g2ZXg7kRPyQXawgAwoMMsv5fHgeBjGDLZNHOvqMkT6+yMN8hxu6DrmLzYOrnHXEccuWnTLzeaM2kkXiEvdad9pJ9W/FQutqIp7mT2y2Ec+aP0fmT6longsPmluybNmy09b9gFFrLkTiOo84Gxy4uW2exOIpPqMes+SY+qQDvR2Iw2fcdibyTIetOm3ZsiX1qTZHY/E8S1atO+Os57V6icSl/qs6EZyvmHpJJwadM3qg5UQ7jHeqk6GbslXf0+YsXm5qw5p6yBWhn+aa+d0281PW/ZWDC68DMbKN/+Fx/okLySkEzuYkPMRuloXVvsEAf9PGcTiLQvi3hzIREJGQ83W2UaKvRek+djM7j4Zt4H/IMStW1KNubcMhEW9Qp8L7p+ZeGc4n4u1qalX9cqBgQbyj9USTO1M2/IOFSRiJjznpm446ZMkZ73ZJi1CJ+AO1ZNXcuvqjwJSCuF2tmaq3iAUT8X2mVtuGraTe0y1OtI/056067Jhjjjhi5jP+Vtt7brZi3YaZmQ1Tt4iJfeIDatXcmu8JLp3hm2rdtI26jxuZzI8S7Q5cZ2rRUcccc9Qhcw94jZgYm4j/qNbNzKyr/ynGFsRvq1V1xOVi4oDPqjUzc2uWnTR1n6d2j5PMmXAPqWMBhTEnTK37eRELRp7pqLlpwCDzA2Js4n8HB14KL/JgMJ+ZmTtjxaqXdImjHQ5ExvZ5h6NWLTrmMctOWVG/72qxX7yrhUGqviBGrvYNtabebyTeptbCUB1H67aFzHfTA5f6orlFxwJ7S+rrvl+MPcU3zE3N1Uz9sHiOk2qq/rl4hbM2AkrHzX8nIPg2HIgsiCv8hqnTYfmdtqxW/aKIt6gNVRvmvmzkJjM1V7e4zDe0w/zPXN6NfAsj0CTKxx1SJ510xtzUhvpj3yXubLmQqVf7u+HXkKv9briWBZ40nPTiheFfSJI1l9FNPq7WnDVvvc2I1/puK2YtDL7pu4PRN3wkuGJwoa5+ckHzUW9N2HzoEx7V1uyvq7rdgwHyTN3pzeGfbd+qdfVb88xHxiYWjI8HvV5aIBbP9vuhu6zDQLOl/rxlvNF2PjN3v6uMQ2g6bvTE0df8jnrmEQkZcCtfZh0pCTGSd9d2HQEmJ2ErT9BPI+jGZuvnXDZzFhv5HQ7xMC9GLi5aczZwL1uBrIvxvIvMykj4D97f+r+ezbyDS9jE2ZzGCgBSEsrcFAkxcZMPbWKy3a8CDeAv+RJryYkWFd0iVS5mnI38NldxERs4M1xLadAgB6qkrGTbwgjELX3fNJlyDvdx4wI4zHUgosxPOZ+NbZiUQ28CCQVylrKTKyLhMjYzxhRHmWGCBik52QKd385XWYFvM/XIwugL1JCEfvqAjGPs5H95mlciP8599JHTICKnQcoUdaY5QI1JhskoM8MIIxylBJzLY1zedeQ7jdNSXccVU43D7GIPL/MKx5roFhhkKUeJiFlKgQKDrAEGuaajuwqTVEjYy7K3NQtsmYWD7OV1/os9TDDWNsckjyzwD3yaOjkx/WRIAykQkyODgZ4JJ9/kIHv4N15lL0fbzMbk5MeJHglLuZ6zGWAF61hJP4OcwgCyhNX0EdFPTEyyKOgnKLiPp9jNLl7rWfqAHCLn1zRiYiKgj1UUgAEGGGAZy5EzGOCjXN2DAxLxS3bxC+pESI0IMQzhCDWKlE/UVSKbItoWZRZrl/AwF/dM7BfGps4UKceoUOEV7mM4rEB2S9BOHLGx/SJu9p/Dup+5cKu5vxUf6kGSTTrptGVnrVq3Ylnd46WLxYL2iHAGf82nGCQnb+N3t/escgu/5gqu5lJOD/fO0EAiIiIy6kCDNRzkg4uVUJoxsc/PeCREv1TVh/x1iPqdLVcnvEzEpV7pZ33I1yyHq1WPWXTYUUd9S/1Kb+PNWH6jO0NIbhrf51X+VZDd3Vqu1ryuTYav8Hxv8+u+4DHrps46YcmGB9yysPkkSNSnW8braur99nmjmpurz9nowonUzFn/UOyzr02S9LnRj3ivP/GIh/ySZywkSJoyYqPfsKpOmQZBstv3iVfaCMJ8hx9rKcQ8fObB4dzUvxCTQOSkrXCB57mhaWnhd/+cR9SykyE7SN3uklCSaxod83R3qJmj7grGM3MnrIbURO9uacwTgixpJb1RtwpJLG70KTMnLFpyyrL6opeJBZf4Y7Vm3cwPiftU/Xc3O2PDhqn6c3/folq1qj4wx4W55O6SFyD+iW85a9FRRy2qJT9rvzgg3q3WralfE5d7UNUfiPcE5VhX73a9e9QJJ9UdJgsWeelcflb5qOMWHXHcYijIvEtCanattWD+JZcaeaFlG+oDRq72oJmpDRvq5a7zh2op9JEsVMLtTEketeEBD/mWQ9Y94B1htBJxk8PWrdtwwgtEvM7cqvoVEbcF8tXVX7rMAb+pTjtu7o88rXuGMNf8Cnd52Nc96FGnfcJNYbQiY5f4XKiW6cfCgNyqzqp3iQVjn1HLVpwM1RK807pTvqm+0Ko2LJgdRy7xe9adcNxfuC2k5cczxq+pJSfVh0PNAL8VEvPbwhBdaMmKU047bc0tIv6Rx6z4pqk/853zXeik4Kne7s2+13Vt3C2InzRzzAn1ZQcDhxN3m1m27pbWunmnWrLspA13utyC+Hv+n5mHnfGAF3fW0nuthFFrVbjIcScseswx39laqFY67Kzl1j5CZMFBnzN30imH1e1hqNb6mJkjTgYXkl6V0qRtqWh2u859lh12OJShjjP6WuuWrXo44NU8e4HTlhxx1FFLvreVhH3KMUuWfNJCez128WgY+YQVixbNfbBVCS6InzZ33Kr7XdYCtiB+wdyi4w5b9WUHWoy53Bdt+KxL374DBfEupz3gQWd83pUB/CYK99rwqFO+1AZpZGy/z1qz6JhDZm4PXErEVd7TWaxdrFZ+o1Me8oDjvuD6OXXgAZ911iFn/Jc5tIrFcy064Zijjlj0/HA2Prktm5ictfw9MzRYyRDbGGptzgGcyiaqRPQxPCdTykl4nb9jGVVqVKC1iZMTkXTmVHEP4Qxb2UCJ5YxwEwdJWuYj4BxOoU5EQrGjn4wCj/A9VlChwQDr2uRa1il7e29axQyynhpb2R+U4QkHLiNjhhkaHJ63TZUR8QUOs5HTWcp4L8FZ6JlgPMoI1/NV9hLPS1c3hdpBykyXZ2OG+WM+wkqe5qWQKZ70zmln5Yw5OyHPO+IhD1rxo3O2aTqKUIsdBXrvHTd3wPJ5V/pZEoR2meF5G3XHUYiQqMfbL7ptJ1lIJOcWZRJGeZI15CylypGuDkBO1qPScFJD0C1zWuUOh33VW092t3juEclv3CJuYCdH56wOJ93+H3IN1mzlSN+MAAAAAElFTkSuQmCC';
   const isVjudge = location.hostname === 'vjudge.net';
-  const HAS_NATIVE_COPY = /^(www\.luogu\.com\.cn|newoj\.daimayuan\.top)$/.test(location.hostname);
+  const HAS_NATIVE_COPY = /^(www\.luogu\.com\.cn|(new)?oj\.daimayuan\.top)$/.test(location.hostname);
 
   // 脚本在 document-start 运行：赶在网站自己的脚本之前，在 window 捕获阶段注册复制和快捷键监听。
   // 有的 OJ（如代码源）会拦截 copy 事件和按键，后注册的监听器会被它们挡掉。
@@ -517,7 +521,22 @@
     if (/leetcode\./.test(host)) return extractLeetCode();
     if (host === 'vjudge.net') return extractVjudge();
     if (host === 'newoj.daimayuan.top') return extractHydro();
+    if (host === 'oj.daimayuan.top') return extractUoj();
     return null;
+  }
+
+  // 代码源旧 OJ（UOJ 系统）：题面在 .uoj-article 里，公式是 MathJax，标题形如「A. 逆序对」或「#3259. 逆序对」
+  function extractUoj() {
+    const el = document.querySelector('.uoj-article');
+    if (!el) return null;
+    const h = [...document.querySelectorAll('h1, h2')]
+      .find((x) => /^\s*(#\d+|[A-Z]\d*)\s*[.．]\s*\S/.test(x.textContent));
+    const title = (h?.textContent || document.title.replace(/\s*-\s*Daimayuan Online Judge\s*$/i, ''))
+      .replace(/\s+/g, ' ').trim();
+    // 页面顶部的「时间限制:2 s」「空间限制:256 MB」小标签
+    const limits = [...document.querySelectorAll('.label, .badge')]
+      .map((e) => e.textContent.replace(/\s+/g, '').trim()).filter((t) => /限制/.test(t));
+    return { title, statement: (limits.length ? limits.join('，') + '\n\n' : '') + htmlToMarkdown(el) };
   }
 
   // 代码源 newoj（Hydro 系统）：优先读 UiContext.pdoc 里的原始 Markdown，读不到就读页面 DOM
@@ -751,7 +770,7 @@
       k.replaceWith(document.createTextNode(display ? `\n$$${ann.textContent}$$\n` : `$${ann.textContent}$`));
     });
     // MathJax 2（Codeforces）：源码在 <script type="math/tex"> 中
-    root.querySelectorAll('.MathJax_Preview, .MathJax, .MathJax_Display, .MJX_Assistive_MathML, .MathJax_SVG, .MathJax_CHTML')
+    root.querySelectorAll('.MathJax_Preview, .MathJax, .MathJax_Display, .MJX_Assistive_MathML, .MathJax_SVG, .MathJax_SVG_Display, .MathJax_CHTML, .mjx-chtml')
       .forEach((e) => e.remove());
     root.querySelectorAll('script[type^="math/tex"]').forEach((s) => {
       const display = /mode=display/.test(s.type);
