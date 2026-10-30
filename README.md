@@ -4,9 +4,9 @@
 
 ## 安装与更新
 
-先安装 Tampermonkey 或 Violentmonkey，再打开 [安装脚本](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js)。
+先安装 Tampermonkey 或 Violentmonkey，再打开 [安装脚本](https://raw.githubusercontent.com/koma404/oj-claude-helper/main/claude-contest-helper.user.js)。
 
-为保留原有更新路径，脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。当前版本为 2.0.3，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
+自动检查更新和下载地址均明确指向 `main` 分支。脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。当前版本为 2.0.4，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
 
 ## 两个悬浮球与独立开关
 

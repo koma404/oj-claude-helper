@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Contest → Claude / ChatGPT 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      2.0.3
+// @version      2.0.4
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude / ChatGPT（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
-// @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js
-// @downloadURL  https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js
+// @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/main/claude-contest-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/koma404/oj-claude-helper/main/claude-contest-helper.user.js
 // @match        https://codeforces.com/*
 // @match        https://*.codeforces.com/*
 // @match        https://codeforc.es/*
