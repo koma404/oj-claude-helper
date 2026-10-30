@@ -1,8 +1,8 @@
 // ==UserScript==
-// @name         Contest → Claude 一键解题
+// @name         Contest → Claude / ChatGPT 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      1.1.1
-// @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude（网页版或 API）
+// @version      2.0.0
+// @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude / ChatGPT（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
 // @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js
@@ -18,6 +18,7 @@
 // @match        https://newoj.daimayuan.top/*
 // @match        http://oj.daimayuan.top/*
 // @match        https://oj.daimayuan.top/*
+// @match        https://chatgpt.com/*
 // @match        https://claude.ai/*
 // @grant        GM_setValue
 // @grant        GM_getValue
@@ -27,6 +28,7 @@
 // @grant        GM_registerMenuCommand
 // @grant        GM_xmlhttpRequest
 // @grant        unsafeWindow
+// @connect      api.openai.com
 // @connect      api.anthropic.com
 // @connect      vjudge.net
 // @connect      vjudge.net.cn
@@ -36,27 +38,42 @@
 // @noframes
 // ==/UserScript==
 
-(function () {
+['claude', 'chatgpt'].forEach((provider) => {
   'use strict';
 
   // ---------------------------------------------------------------------------
   // 配置（可通过油猴菜单修改，保存在脚本存储中）
   // ---------------------------------------------------------------------------
+  const isClaude = provider === 'claude';
+  const label = isClaude ? 'Claude' : 'ChatGPT';
   const DEFAULTS = {
-    mode: 'web',             // 'web'：打开 claude.ai 自动填入；'api'：调用 Anthropic API 在页面内显示
+    enabled: true,
+    mode: 'web',             // web：填入对应平台网页；api：调用对应平台 API
     autoSend: false,         // web 模式下填入后是否自动点击发送（默认只填入，由你自己按发送）
-    apiKey: '',              // api 模式需要
-    model: 'claude-opus-5-5',
-    // web 模式下打开的地址：填 Claude 项目链接则在该项目里新建对话；留空则用 https://claude.ai/new
-    projectUrl: 'https://claude.ai/project/01a16288-a5b3-710f-8a63-c585da9e1e13',
+    openaiApiKey: '',              // api 模式需要
+    openaiModel: 'gpt-4.1',
+    // web 模式支持 ChatGPT 首页、GPT 首页和项目首页；默认新对话。
+    chatgptUrl: '',
     maxTokens: 16000,
     tabPos: null,            // 悬浮标签位置（拖动后自动保存）
     vjudgeSidebar: true,     // Vjudge 左侧面板里是否显示按钮
   };
-  const cfg = (k) => GM_getValue(k, DEFAULTS[k]);
-  // 项目换过地址：菜单里保存的还是旧项目时，自动换成新项目
-  if (GM_getValue('projectUrl') === 'https://claude.ai/project/01a11f70-bbd7-727e-9e27-93b81bc5d979') GM_setValue('projectUrl', DEFAULTS.projectUrl);
-  const PENDING_KEY = 'pendingPrompt';
+  const isChatGPTStartUrl = (value) => {
+    try {
+      const u = new URL(value);
+      return u.origin === 'https://chatgpt.com' && !u.search && !u.hash
+        && /^\/(?:g\/[\w-]+(?:\/project)?)?\/?$/.test(u.pathname);
+    } catch (_) { return false; }
+  };
+  // Claude 沿用原有存储；GPT 使用独立存储，避免旧密钥跨平台发送。
+  const storageKey = (k) => {
+    if (k === 'enabled') return provider + 'Enabled';
+    if (isClaude) return ({openaiApiKey:'apiKey', openaiModel:'model', chatgptUrl:'projectUrl'})[k] || k;
+    return 'chatgpt_' + k;
+  };
+  const cfg = (k) => GM_getValue(storageKey(k), k === 'openaiModel' && isClaude ? 'claude-sonnet-4-6' : DEFAULTS[k]);
+  const saveCfg = (k, v) => GM_setValue(storageKey(k), v);
+  const PENDING_KEY = isClaude ? 'pendingPrompt' : 'chatgptPendingPrompt';
   const PENDING_TTL = 2 * 60 * 1000;
 
   // 只在题目页面显示按钮。Vjudge / LeetCode 是单页应用，URL 变化时不刷新页面，所以要持续检查。
@@ -75,18 +92,19 @@
     && r.path.test(location.pathname) && (!r.hash || r.hash.test(location.hash)));
 
   // ---------------------------------------------------------------------------
-  // claude.ai 端：读取待发送的题目并填入输入框
+  // chatgpt.com 端：读取待发送的题目并填入输入框
   // ---------------------------------------------------------------------------
-  if (location.hostname === 'claude.ai') {
-    runOnClaude();
+  if (location.hostname === 'chatgpt.com' || location.hostname === 'claude.ai') {
+    if (isClaude && location.hostname === 'claude.ai') runOnClaude();
+    if (!isClaude && location.hostname === 'chatgpt.com') runOnChatGPT();
     return;
   }
 
   // ---------------------------------------------------------------------------
   // 题目页面端
   // ---------------------------------------------------------------------------
-  // Claude 图标（白色透明底 PNG），用作 CSS mask，颜色跟随 currentColor
-  const ICON_URL = 'data:image/png;base64,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';
+  // 对话气泡图标（SVG），用作 CSS mask，颜色跟随 currentColor
+  const ICON_URL = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="black" d="M4 3h24v20H14l-8 6v-6H4z"/></svg>');
   const isVjudge = location.hostname === 'vjudge.net';
   const HAS_NATIVE_COPY = /^(www\.luogu\.com\.cn|(new)?oj\.daimayuan\.top)$/.test(location.hostname);
 
@@ -101,7 +119,7 @@
   }, true);
   window.addEventListener('keydown', (e) => {
     if (!e.altKey || !e.shiftKey || !isProblemPage()) return;
-    if (e.code === 'KeyC') { e.preventDefault(); e.stopImmediatePropagation(); sendToClaude(); }
+    if (e.code === (isClaude ? 'KeyC' : 'KeyG') && cfg('enabled')) { e.preventDefault(); e.stopImmediatePropagation(); sendToChatGPT(); }
     if (e.code === 'KeyM') { e.preventDefault(); e.stopImmediatePropagation(); copyMarkdown(); }
   }, true);
 
@@ -126,7 +144,7 @@
     const onProblem = isProblemPage();
     const panel = isVjudge ? document.querySelector('#prob-operation') : null;
     if (panel) {
-      const show = onProblem && cfg('vjudgeSidebar');
+      const show = onProblem && cfg('enabled') && cfg('vjudgeSidebar');
       if (show && (!sidebarRow || !panel.contains(sidebarRow))) {
         sidebarRow?.remove();
         sidebarRow = createSidebarRow();
@@ -135,7 +153,7 @@
       if (sidebarRow) sidebarRow.style.display = show ? '' : 'none';
       edgeTab.style.display = 'none';
     } else {
-      edgeTab.style.display = onProblem ? 'flex' : 'none';
+      edgeTab.style.display = onProblem && cfg('enabled') ? 'flex' : 'none';
     }
   }
 
@@ -144,29 +162,31 @@
     style.textContent = `
       .cc-icon { display:inline-block; width:1.1em; height:1.1em; flex:none; vertical-align:-0.15em;
         background-color:currentColor; -webkit-mask:url(${ICON_URL}) center/contain no-repeat; mask:url(${ICON_URL}) center/contain no-repeat; }
-      #cc-edge-tab { position:fixed; right:0; top:62%; z-index:2147483646; display:none; align-items:center;
-        padding-right:4px; border-radius:999px 0 0 999px; background:#d97757; color:#fff;
+      .cc-edge-tab { position:fixed; right:0; top:62%; z-index:2147483646; display:none; align-items:center;
+        padding-right:4px; border-radius:999px 0 0 999px; background:#10a37f; color:#fff;
         font:600 14px/1 system-ui, sans-serif; white-space:nowrap; user-select:none; touch-action:none;
         box-shadow:0 2px 10px rgba(0,0,0,.25); transform:translateX(calc(100% - 34px)); transition:transform .2s ease; }
-      #cc-edge-tab.cc-left { right:auto; left:0; flex-direction:row-reverse; padding:0 0 0 4px;
+      .cc-edge-tab.cc-left { right:auto; left:0; flex-direction:row-reverse; padding:0 0 0 4px;
         border-radius:0 999px 999px 0; transform:translateX(calc(-100% + 34px)); }
-      #cc-edge-tab.cc-open { transform:translateX(0); }
-      #cc-edge-tab .cc-handle:hover { background:rgba(0,0,0,.12); border-radius:999px; }
+      .cc-edge-tab.cc-open { transform:translateX(0); }
+      .cc-edge-tab .cc-handle:hover { background:rgba(0,0,0,.12); border-radius:999px; }
       /* 拖动时变成跟随鼠标的小球，松手后吸附到最近的左右边缘 */
-      #cc-edge-tab.cc-ball { right:auto; width:40px; height:40px; padding:0; justify-content:center; border-radius:50%;
+      .cc-edge-tab.cc-ball { right:auto; width:40px; height:40px; padding:0; justify-content:center; border-radius:50%;
         transform:none; transition:none; box-shadow:0 0 0 3px #fff, 0 4px 14px rgba(0,0,0,.3); }
-      #cc-edge-tab.cc-ball button { display:none; }
-      #cc-edge-tab.cc-ball .cc-handle { width:40px; height:40px; background:none; }
-      #cc-edge-tab.cc-ball .cc-icon { width:20px; height:20px; }
-      #cc-edge-tab.cc-notrans { transition:none !important; }
-      #cc-edge-tab.cc-snapping { transition:left .22s cubic-bezier(.3,1.4,.6,1), top .22s ease; }
-      #cc-edge-tab .cc-handle { display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex:none; cursor:grab; }
-      #cc-edge-tab.cc-dragging, #cc-edge-tab.cc-dragging * { cursor:grabbing; }
-      #cc-edge-tab .cc-icon { width:16px; height:16px; }
-      #cc-edge-tab button { height:26px; margin:4px 0; padding:0 10px; border:none; border-radius:999px;
+      .cc-edge-tab.cc-ball button { display:none; }
+      .cc-edge-tab.cc-ball .cc-handle { width:40px; height:40px; background:none; }
+      .cc-edge-tab.cc-ball .cc-icon { width:20px; height:20px; }
+      .cc-edge-tab.cc-notrans { transition:none !important; }
+      .cc-edge-tab.cc-snapping { transition:left .22s cubic-bezier(.3,1.4,.6,1), top .22s ease; }
+      .cc-edge-tab .cc-handle { display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex:none; cursor:grab; }
+      .cc-edge-tab.cc-dragging, .cc-edge-tab.cc-dragging * { cursor:grabbing; }
+      .cc-edge-tab .cc-icon { width:16px; height:16px; }
+      .cc-edge-tab button { height:26px; margin:4px 0; padding:0 10px; border:none; border-radius:999px;
         background:transparent; color:inherit; font:inherit; cursor:pointer; }
-      #cc-edge-tab button:hover { background:rgba(0,0,0,.15); }
-      .cc-vjudge-btn .cc-icon { color:#d97757; margin-right:4px; }
+      .cc-edge-tab button:hover { background:rgba(0,0,0,.15); }
+      .cc-edge-tab:not(.cc-open):not(.cc-ball) { width:38px; height:38px; padding:0; border-radius:50%; transform:none; overflow:hidden; justify-content:center; }
+      .cc-edge-tab:not(.cc-open) button { display:none; }
+      .cc-vjudge-btn .cc-icon { color:#10a37f; margin-right:4px; }
     `;
     document.head.appendChild(style);
   }
@@ -181,13 +201,17 @@
   // 其它网站：贴在屏幕边缘，平时只露出图标，点图标展开/收起；按住拖动可换位置（拖到左半屏就贴左边）
   function createEdgeTab() {
     const tab = document.createElement('div');
-    tab.id = 'cc-edge-tab';
+    tab.id = 'cc-edge-tab-' + provider;
+    tab.className = 'cc-edge-tab';
+    tab.style.backgroundColor = isClaude ? '#d97757' : '#10a37f';
+    tab.style.top = isClaude ? '52%' : '65%';
     const handle = document.createElement('span');
     handle.className = 'cc-handle';
     handle.title = '点击展开 / 收起，按住拖动可调整位置';
     handle.setAttribute('role', 'button');
     handle.tabIndex = 0;
-    handle.appendChild(createIcon());
+    handle.textContent = isClaude ? 'C' : 'G';
+    handle.setAttribute('aria-label', label + ' 悬浮球');
     const toggle = () => tab.classList.toggle('cc-open');
     handle.addEventListener('click', toggle);
     handle.addEventListener('keydown', (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggle(); } });
@@ -201,7 +225,7 @@
       b.addEventListener('click', () => { tab.classList.remove('cc-open'); fn(); });
       return b;
     };
-    tab.append(handle, mk('问 Claude', '提取题面并发送给 Claude（Alt+Shift+C）。选中文字时只发送选中部分。', sendToClaude));
+    tab.append(handle, mk('问 ' + label, `提取题面并发送给 ${label}（Alt+Shift+${isClaude ? 'C' : 'G'}）。选中文字时只发送选中部分。`, sendToChatGPT));
     // 洛谷、代码源页面自带“复制 Markdown”，不重复放按钮（快捷键 Alt+Shift+M 仍可用）
     if (!HAS_NATIVE_COPY) tab.append(mk('复制 MD', '复制题目 Markdown（Alt+Shift+M）', copyMarkdown));
     document.body.appendChild(tab);
@@ -248,7 +272,7 @@
         const side = parseFloat(tab.style.left) + BALL / 2 < window.innerWidth / 2 ? 'left' : 'right';
         const top = parseFloat(tab.style.top);
         tab.classList.add('cc-snapping');
-        const PEEK = 34; // 收起状态露出的宽度，和 CSS 里的 translateX(100% - 34px) 一致
+        const PEEK = 38; // 收起后的悬浮球直径
         tab.style.left = (side === 'left' ? PEEK - BALL : window.innerWidth - PEEK) + 'px';
         setTimeout(() => {
           // 变回标签时关掉过渡动画，否则 transform 会从“展开”动画到“收起”，看起来闪一下
@@ -257,7 +281,7 @@
           tab.style.left = '';
           const pos = { side, top: (top + BALL / 2 - tab.offsetHeight / 2) / window.innerHeight };
           placeEdgeTab(tab, pos);
-          GM_setValue('tabPos', { side, top: parseFloat(tab.style.top) / window.innerHeight });
+          saveCfg('tabPos', { side, top: parseFloat(tab.style.top) / window.innerHeight });
           void tab.offsetWidth; // 先让无动画的样式生效
           requestAnimationFrame(() => requestAnimationFrame(() => tab.classList.remove('cc-notrans')));
         }, 240);
@@ -288,42 +312,47 @@
       return col;
     };
     row.append(
-      mk('问 Claude', '提取题面并发送给 Claude（Alt+Shift+C）', sendToClaude, true),
+      mk('问 ' + label, `提取题面并发送给 ${label}（Alt+Shift+${isClaude ? 'C' : 'G'}）`, sendToChatGPT, true),
       mk('复制 MD', '复制题目 Markdown（Alt+Shift+M）', copyMarkdown, false));
     return row;
   }
 
+  const registerProviderMenu = (name, fn) => GM_registerMenuCommand('[' + label + '] ' + name, fn);
   function registerMenu() {
-    GM_registerMenuCommand(`模式：${cfg('mode') === 'web' ? '网页版 claude.ai' : 'API'}（点击切换）`, () => {
-      GM_setValue('mode', cfg('mode') === 'web' ? 'api' : 'web');
-      alert('已切换为：' + (cfg('mode') === 'web' ? '网页版 claude.ai' : 'API') + '，刷新页面后菜单文字更新');
+    registerProviderMenu(`悬浮球：${cfg('enabled') ? '开' : '关'}（点击切换）`, () => {
+      saveCfg('enabled', !cfg('enabled'));
+      syncUi();
     });
-    GM_registerMenuCommand(`网页版自动发送：${cfg('autoSend') ? '开' : '关'}（点击切换）`, () => {
-      GM_setValue('autoSend', !cfg('autoSend'));
+    registerProviderMenu(`模式：${cfg('mode') === 'web' ? '网页版 ' + label : 'API'}（点击切换）`, () => {
+      saveCfg('mode', cfg('mode') === 'web' ? 'api' : 'web');
+      alert('已切换为：' + (cfg('mode') === 'web' ? '网页版 ' + label : 'API') + '，刷新页面后菜单文字更新');
+    });
+    registerProviderMenu(`网页版自动发送：${cfg('autoSend') ? '开' : '关'}（点击切换）`, () => {
+      saveCfg('autoSend', !cfg('autoSend'));
       alert('自动发送：' + (cfg('autoSend') ? '开' : '关'));
     });
-    GM_registerMenuCommand('设置 API Key', () => {
-      const v = prompt('Anthropic API Key（仅保存在本地油猴存储中）', cfg('apiKey'));
-      if (v !== null) GM_setValue('apiKey', v.trim());
+    registerProviderMenu('设置 API Key', () => {
+      const v = prompt((isClaude ? 'Anthropic' : 'OpenAI') + ' API Key（仅保存在本地油猴存储中）', cfg('openaiApiKey'));
+      if (v !== null) saveCfg('openaiApiKey', v.trim());
     });
-    GM_registerMenuCommand(`Claude 项目：${cfg('projectUrl') || '无（claude.ai/new）'}`, () => {
-      const v = prompt('Claude 项目链接（形如 https://claude.ai/project/xxxx），留空则不使用项目', cfg('projectUrl'));
+    registerProviderMenu(`${label} 页面：${cfg('chatgptUrl') || '新对话'}`, () => {
+      const v = prompt(isClaude ? 'Claude 项目链接 https://claude.ai/project/<ID>；留空使用新对话' : 'ChatGPT 首页、GPT 首页或项目首页链接；留空使用新对话', cfg('chatgptUrl'));
       if (v === null) return;
       const url = v.trim();
-      if (url && !/^https:\/\/claude\.ai\/project\/[\w-]+\/?$/.test(url)) { alert('链接格式不对'); return; }
-      GM_setValue('projectUrl', url);
+      if (url && !(isClaude ? /^https:\/\/claude\.ai\/project\/[\w-]+\/?$/.test(url) : isChatGPTStartUrl(url))) { alert('请填写有效的 ' + label + ' 页面链接'); return; }
+      saveCfg('chatgptUrl', url);
     });
-    GM_registerMenuCommand(`Vjudge 侧边栏按钮：${cfg('vjudgeSidebar') ? '显示' : '隐藏'}（点击切换）`, () => {
-      GM_setValue('vjudgeSidebar', !cfg('vjudgeSidebar'));
+    registerProviderMenu(`Vjudge 侧边栏按钮：${cfg('vjudgeSidebar') ? '显示' : '隐藏'}（点击切换）`, () => {
+      saveCfg('vjudgeSidebar', !cfg('vjudgeSidebar'));
       toast('Vjudge 侧边栏按钮：' + (cfg('vjudgeSidebar') ? '显示' : '隐藏'));
     });
-    GM_registerMenuCommand(`API 模型：${cfg('model')}`, () => {
-      const v = prompt('模型 ID', cfg('model'));
-      if (v) GM_setValue('model', v.trim());
+    registerProviderMenu(`API 模型：${cfg('openaiModel')}`, () => {
+      const v = prompt('模型 ID', cfg('openaiModel'));
+      if (v) saveCfg('openaiModel', v.trim());
     });
-    GM_registerMenuCommand('复制题目 Markdown', copyMarkdown);
+    registerProviderMenu('复制题目 Markdown', copyMarkdown);
     if (isVjudge) {
-      GM_registerMenuCommand('调试：复制 Vjudge 描述页源码', async () => {
+      registerProviderMenu('调试：复制 Vjudge 描述页源码', async () => {
         const frame = findDescFrame();
         if (!frame) { toast('没找到题面 iframe'); return; }
         const html = await (await fetch(frameUrl(frame), { credentials: 'include' })).text();
@@ -334,12 +363,12 @@
       });
     }
     if (!isVjudge) {
-      GM_registerMenuCommand('调试：复制页面信息', debugPageInfo);
+      registerProviderMenu('调试：复制页面信息', debugPageInfo);
     }
-    GM_registerMenuCommand('重置悬浮标签位置', () => {
-      GM_deleteValue('tabPos');
+    registerProviderMenu('重置悬浮标签位置', () => {
+      GM_deleteValue(storageKey('tabPos'));
       edgeTab.classList.remove('cc-left');
-      edgeTab.style.top = '';
+      edgeTab.style.top = isClaude ? '52%' : '65%';
     });
   }
 
@@ -361,12 +390,12 @@
     step('正文元素', () => {
       const main = document.querySelector('.problem-content, [data-fragment-id="problem-description"], main, #main, .main, article') || document.body;
       const clone = main.cloneNode(true);
-      clone.querySelectorAll('script, style, svg, #cc-edge-tab').forEach((e) => e.remove());
+      clone.querySelectorAll('script, style, svg, .cc-edge-tab').forEach((e) => e.remove());
       html = clone.outerHTML.slice(0, 30000);
       return `<${main.tagName.toLowerCase()} id="${main.id}" class="${String(main.className)}">`;
     });
     const text = parts.join('\n') + '\n\n' + html;
-    console.log('[Contest→Claude] 调试信息\n' + text);
+    console.log('[Contest→ChatGPT] 调试信息\n' + text);
     showPanel(text);
     toast(await copyText(text) ? '已复制页面信息；也可以在面板里点「复制全部」' : '复制失败，请在面板里手动复制');
   }
@@ -408,13 +437,13 @@
   }
 
   let sending = false;
-  async function sendToClaude() {
+  async function sendToChatGPT() {
     if (sending) return; // 下载 PDF 要一会儿，防止连点发两次
     sending = true;
-    try { await doSendToClaude(); } finally { sending = false; }
+    try { await doSendToChatGPT(); } finally { sending = false; }
   }
 
-  async function doSendToClaude() {
+  async function doSendToChatGPT() {
     const msg = await buildMessage();
     if (!msg) return;
     copyText(msg.text); // 兜底：自动填入失败时可直接粘贴
@@ -427,14 +456,14 @@
         try {
           pdf = { name: msg.pdfName, data: await fetchPdfBase64(url) };
           if (!msg.pdfUrl) msg.text = msg.text.replace(/题面见 PDF：.*$/, `题面见 PDF：${url}`);
-          console.info('[Contest→Claude] PDF 来自', url);
+          console.info('[Contest→ChatGPT] PDF 来自', url);
           break;
         } catch (e) {
           errors.push(`${url} → ${e.message}`);
         }
       }
       if (!pdf) {
-        console.error('[Contest→Claude] PDF 下载失败\n' + errors.join('\n'));
+        console.error('[Contest→ChatGPT] PDF 下载失败\n' + errors.join('\n'));
         toast('PDF 下载失败（详情见控制台），只发送标题和链接');
       }
     }
@@ -442,12 +471,12 @@
       askApi(msg.text, pdf);
     } else {
       GM_setValue(PENDING_KEY, { prompt: msg.text, pdf, autoSend: cfg('autoSend'), ts: Date.now() });
-      GM_openInTab(cfg('projectUrl') || 'https://claude.ai/new', { active: true, insert: true });
-      toast(pdf ? '已打开 claude.ai，PDF 会作为附件上传' : '已打开 claude.ai（题面也已复制到剪贴板）');
+      GM_openInTab(isClaude ? (cfg('chatgptUrl') || 'https://claude.ai/new') : (isChatGPTStartUrl(cfg('chatgptUrl')) ? cfg('chatgptUrl') : 'https://chatgpt.com/'), { active: true, insert: true });
+      toast('已打开 ' + label + '，题面已复制；有 PDF 时请确认附件上传');
     }
   }
 
-  // 只发送题目本身（标题、链接、题面），不附加任何提示词——提示词由 Claude 项目的自定义指令提供。
+  // 只发送题目本身（标题、链接、题面），不附加任何提示词——提示词由 ChatGPT 项目的自定义指令提供。
   // 返回 { text, pdfUrl?, pdfName? }；只有 PDF 题面时 text 只含标题和链接，PDF 作为附件发送。
   async function buildMessage() {
     const sel = String(window.getSelection() || '').trim();
@@ -455,7 +484,7 @@
     if (sel.length > 20) {
       problem = { title: document.title, statement: sel };
     } else {
-      try { problem = await extractProblem(); } catch (e) { console.error('[Contest→Claude]', e); }
+      try { problem = await extractProblem(); } catch (e) { console.error('[Contest→ChatGPT]', e); }
     }
     if (problem?.pdfUrl) {
       const title = problem.title.trim();
@@ -656,7 +685,7 @@
     if (looksPdf && plainLen(statement.replace(/\[pdf:[^\]]*\]/gi, '')) < 80) {
       const panelPdf = document.querySelector('#btn-contest-problem-pdf, a[href*="problemPdf"]')?.getAttribute('href');
       const abs = (u) => new URL(u, src).href;
-      // 下载顺序：原始 PDF（CDN）优先，左侧面板的 PDF 按钮兜底；发给 Claude 的文字里用面板链接（能直接在浏览器打开）
+      // 下载顺序：原始 PDF（CDN）优先，左侧面板的 PDF 按钮兜底；发给 ChatGPT 的文字里用面板链接（能直接在浏览器打开）
       pdfUrls = [...new Set([pdfUrl !== 'pdf' && pdfUrl, ...markerUrls, descPdf, panelPdf].filter(Boolean).map(abs))];
       if (!pdfUrls.length) pdfUrls = null;
       pdfLink = panelPdf ? abs(panelPdf) : pdfUrls?.[0];
@@ -851,7 +880,50 @@
   // API 模式
   // ---------------------------------------------------------------------------
   function askApi(promptText, pdf) {
-    const key = cfg('apiKey');
+    if (isClaude) return askClaudeApi(promptText, pdf);
+    const key = cfg('openaiApiKey');
+    if (!key) {
+      alert('API 模式需要先在油猴菜单里「设置 API Key」');
+      return;
+    }
+    const panel = showPanel('ChatGPT 正在思考…（可能需要一两分钟）');
+    GM_xmlhttpRequest({
+      method: 'POST',
+      url: 'https://api.openai.com/v1/responses',
+      headers: {
+        'content-type': 'application/json',
+        'Authorization': `Bearer ${key}`,
+      },
+      data: JSON.stringify({
+        model: cfg('openaiModel'),
+        max_output_tokens: cfg('maxTokens'),
+        input: [{
+          role: 'user',
+          content: [
+            ...(pdf ? [{ type: 'input_file', filename: pdf.name || 'problem.pdf', file_data: `data:application/pdf;base64,${pdf.data}` }] : []),
+            { type: 'input_text', text: promptText },
+          ],
+        }],
+      }),
+      timeout: 10 * 60 * 1000,
+      onload: (res) => {
+        let data;
+        try { data = JSON.parse(res.responseText); } catch (_) { panel.set('解析响应失败：\n' + res.responseText); return; }
+        if (data.error) { panel.set(`API 错误（${res.status}）：${data.error.message}`); return; }
+        if (res.status < 200 || res.status >= 300) { panel.set(`API HTTP 错误：${res.status}`); return; }
+        const text = (data.output || []).flatMap((item) => item.content || [])
+          .filter((b) => b.type === 'output_text' || b.type === 'refusal')
+          .map((b) => b.text || b.refusal).join('\n');
+        if (data.status === 'incomplete') { panel.set(text + '\n\n（响应未完成：' + (data.incomplete_details?.reason || '未知原因') + '）'); return; }
+        panel.set(text || '（空响应）');
+      },
+      onerror: () => panel.set('网络错误，请检查网络或代理'),
+      ontimeout: () => panel.set('请求超时'),
+    });
+  }
+
+  function askClaudeApi(promptText, pdf) {
+    const key = cfg('openaiApiKey');
     if (!key) {
       alert('API 模式需要先在油猴菜单里「设置 API Key」');
       return;
@@ -867,7 +939,7 @@
         'anthropic-dangerous-direct-browser-access': 'true',
       },
       data: JSON.stringify({
-        model: cfg('model'),
+        model: cfg('openaiModel'),
         max_tokens: cfg('maxTokens'),
         messages: [{
           role: 'user',
@@ -890,9 +962,9 @@
   }
 
   function showPanel(initial) {
-    document.getElementById('claude-contest-panel')?.remove();
+    document.getElementById(provider + '-contest-panel')?.remove();
     const wrap = document.createElement('div');
-    wrap.id = 'claude-contest-panel';
+    wrap.id = provider + '-contest-panel';
     Object.assign(wrap.style, {
       position: 'fixed', right: '20px', bottom: '70px', width: 'min(640px, calc(100vw - 40px))',
       height: 'min(70vh, 720px)', zIndex: 2147483647, background: '#fff', color: '#222',
@@ -902,7 +974,7 @@
     const bar = document.createElement('div');
     Object.assign(bar.style, { display: 'flex', gap: '8px', padding: '8px 12px', borderBottom: '1px solid #eee', alignItems: 'center' });
     const title = document.createElement('strong');
-    title.textContent = 'Claude';
+    title.textContent = label;
     title.style.flex = '1';
     const mkBtn = (label, fn) => {
       const b = document.createElement('button');
@@ -942,14 +1014,13 @@
   }
 
   // ---------------------------------------------------------------------------
-  // claude.ai 端实现
+  // chatgpt.com 端实现
   // ---------------------------------------------------------------------------
   function runOnClaude() {
     // 只在“新对话”页面（/new 或项目首页）填入
     if (!/^\/(new|project\/[\w-]+\/?$)/.test(location.pathname)) return;
     const data = GM_getValue(PENDING_KEY);
     if (!data || Date.now() - data.ts > PENDING_TTL) return;
-    GM_deleteValue(PENDING_KEY); // 只消费一次，避免其它标签页重复填入
 
     waitFor(() => document.querySelector('div[contenteditable="true"]'), 20000).then(async (editor) => {
       if (!editor) { console.warn('[Contest→Claude] 没找到输入框，提示词已在剪贴板中，可手动粘贴'); return; }
@@ -958,10 +1029,7 @@
       editor = document.querySelector('div[contenteditable="true"]') || editor;
       editor.focus();
       // claude.ai 会保存未发送的草稿，打开时输入框里可能还有上次的文字，先清空
-      if (editor.textContent.trim()) {
-        document.execCommand('selectAll', false);
-        document.execCommand('delete', false);
-      }
+      if (editor.textContent.trim()) { toast('已有草稿，未覆盖，请手动粘贴'); return; }
       // ProseMirror 能正确处理 insertText；失败则模拟粘贴
       const ok = document.execCommand('insertText', false, data.prompt);
       if (!ok || !editor.textContent.trim()) {
@@ -969,7 +1037,9 @@
         dt.setData('text/plain', data.prompt);
         editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
       }
-      if (data.pdf) attachPdf(editor, data.pdf);
+      if (editor.innerText.trim() !== data.prompt.trim()) { toast('自动填入未完成，请从剪贴板粘贴'); return; }
+      GM_deleteValue(PENDING_KEY);
+      if (data.pdf) { attachPdf(editor, data.pdf); toast('请确认 PDF 上传完成后手动发送'); return; }
       if (!data.autoSend) return;
       const sendBtn = await waitFor(() => {
         const b = document.querySelector('button[aria-label="Send message"], button[aria-label="Send Message"], button[aria-label="发送消息"]');
@@ -979,15 +1049,57 @@
     });
   }
 
-  // 上传 PDF 附件：模拟粘贴文件（实测在 claude.ai 上有效）。
-  // 不再做“上传成功”检测和换方式重试——附件里不一定显示文件名，检测不可靠，反而会重复上传。
+  function runOnChatGPT() {
+    if (!isChatGPTStartUrl(location.href)) return;
+    const data = GM_getValue(PENDING_KEY);
+    if (!data || typeof data.prompt !== 'string' || !Number.isFinite(data.ts)
+      || Date.now() - data.ts > PENDING_TTL || data.ts > Date.now()) return;
+    const findEditor = () => document.querySelector('#prompt-textarea[contenteditable="true"], textarea#prompt-textarea, [contenteditable="true"][data-placeholder]');
+    waitFor(findEditor, 30000).then(async (editor) => {
+      if (!editor) { console.warn('[Contest→ChatGPT] 没找到输入框，题面仍保留，可刷新重试或从剪贴板粘贴'); return; }
+      // 等待 React 初始化，避免覆盖现有草稿。
+      await sleep(1000);
+      editor = findEditor();
+      if (!editor || !isChatGPTStartUrl(location.href)) return;
+      const current = editor.tagName === 'TEXTAREA' ? editor.value : editor.textContent;
+      if (current.trim()) { toast('已有草稿，未覆盖。请手动粘贴题面或清空后刷新'); return; }
+      if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
+      editor.focus();
+      if (editor.tagName === 'TEXTAREA') {
+        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(editor, data.prompt);
+        editor.dispatchEvent(new Event('input', { bubbles: true }));
+      } else {
+        document.execCommand('insertText', false, data.prompt);
+      }
+      const inserted = editor.tagName === 'TEXTAREA' ? editor.value : editor.innerText;
+      if (inserted.trim() !== data.prompt.trim()) { toast('自动填入未完成，请从剪贴板粘贴'); return; }
+      GM_deleteValue(PENDING_KEY);
+      if (data.pdf) {
+        attachPdf(editor, data.pdf);
+        toast('已尝试添加 PDF，请确认附件上传完成后手动发送');
+        return; // 文件上传结果无法可靠判断，禁止带附件自动发送。
+      }
+      if (!data.autoSend) return;
+      const sendBtn = await waitFor(() => {
+        if (!isChatGPTStartUrl(location.href)) return null;
+        const b = document.querySelector('button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="发送提示"]');
+        return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' ? b : null;
+      }, 15000);
+      if (sendBtn) sendBtn.click();
+    }).catch((e) => console.error('[Contest→ChatGPT]', e));
+  }
+
+  // 优先使用 ChatGPT 的文件输入控件；没有控件时模拟粘贴。
   function attachPdf(editor, pdf) {
     const bin = atob(pdf.data);
-    const bytes = new Uint8Array(bin.length);
-    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const dt = new DataTransfer();
     dt.items.add(new File([bytes], pdf.name || 'problem.pdf', { type: 'application/pdf' }));
-    editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+    const input = document.querySelector('input[type="file"][accept*=".pdf"], input[type="file"]');
+    if (input) {
+      input.files = dt.files;
+      input.dispatchEvent(new Event('change', { bubbles: true }));
+    } else editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   }
 
   function sleep(ms) {
@@ -1005,4 +1117,4 @@
       })();
     });
   }
-})();
+});
