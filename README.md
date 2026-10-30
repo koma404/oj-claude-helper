@@ -4,13 +4,13 @@
 
 ## 安装与更新
 
-先安装 Tampermonkey 或 Violentmonkey，再打开 [安装脚本](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js)。
+先安装 Tampermonkey 或 Violentmonkey，再打开 [安装脚本](https://raw.githubusercontent.com/koma404/oj-claude-helper/main/claude-contest-helper.user.js)。
 
-为保留原有更新路径，脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。版本升级至 2.0.0，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
+自动检查更新和下载地址均明确指向 `main` 分支。脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。当前版本为 2.0.4，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
 
 ## 两个悬浮球与独立开关
 
-题目页面右侧默认显示两个入口：橙色 **C（Claude）** 和绿色 **G（ChatGPT）**。点击展开按钮，拖动可调整位置；两者分别记忆位置。非题目页面不显示。Vjudge 有侧栏时分别显示在侧栏。
+题目页面右侧默认显示两个入口：橙色 **Claude Logo** 和绿色 **ChatGPT Logo**。点击展开按钮，拖动可调整位置；两者分别记忆位置。非题目页面不显示。Vjudge 有侧栏时分别显示在侧栏。
 
 油猴菜单按 `[Claude]`、`[ChatGPT]` 分组，各有独立的「悬浮球：开 / 关」开关，点击立即生效。关闭后对应快捷键也停用；两者可以都开、只开一个或都关。菜单状态文字刷新页面后更新。
 
@@ -24,18 +24,18 @@
 
 分别在对应平台菜单里选择网页模式、设置目标页面：
 
-- Claude：留空打开 `https://claude.ai/new`，也可配置 `https://claude.ai/project/<ID>`。
+- Claude：默认沿用原版内置项目地址和旧项目迁移；也可配置其他 `https://claude.ai/project/<ID>`，手动留空时打开 `https://claude.ai/new`。
 - ChatGPT：留空打开 `https://chatgpt.com/`，也可配置 GPT 首页 `/g/<ID>` 或项目首页 `/g/<ID>/project`。
 
-需要在自己的浏览器登录对应账号。脚本只传题目标题、链接、题面，不附加解题提示词；项目或 GPT 的自定义指令由用户配置。题面同时复制到剪贴板，自动填入失败时可手动粘贴。已有草稿不会被覆盖；清空后刷新可在两分钟有效期内重试。
+需要在自己的浏览器登录对应账号。脚本只传题目标题、链接、题面，不附加解题提示词；项目或 GPT 的自定义指令由用户配置。题面同时复制到剪贴板，自动填入失败时可手动粘贴。与最初版一致，新对话输入框已有草稿时会清空并填入本次题面。待填入数据有效期两分钟，ChatGPT 最多等待 90 秒，支持带模型/临时聊天参数的首页和登录后的页面跳转；编辑器重新渲染时会重试。
 
-默认填入后由用户检查并手动发送。两个平台分别有「网页版自动发送」选项；带 PDF 时始终要求手动确认附件上传后发送。网页结构变化可能影响自动填入或附件上传，页面已有对话不会接收新题面。
+默认填入后由用户检查并手动发送。两个平台分别有「网页版自动发送」选项；PDF 也遵循对应平台的自动发送开关；默认仍为关闭。网页结构变化可能影响自动填入或附件上传，页面已有对话不会接收新题面。
 
 ## API 模式
 
 在对应平台菜单中切换为 API 模式并设置密钥和模型 ID，答案显示在题目页面板，可复制全部或最后一个代码块。
 
-- Claude：Anthropic Messages API，默认模型 `claude-sonnet-4-6`，已有自定义模型继续保留。
+- Claude：保留原版 Anthropic Messages API，默认模型 `claude-opus-5-5`，已有自定义模型继续保留。
 - ChatGPT：OpenAI Responses API，默认模型 `gpt-4.1`。
 
 密钥只保存在本地油猴存储；两个平台分开保存和使用。API 按对应服务独立计费，网页会员不等于 API 额度。模型需在账号中可用，API 模式不带网页项目或 GPT 的自定义指令。PDF 题面分别以 Anthropic document 或 OpenAI input_file 发送，需要支持文件输入的模型。
@@ -71,6 +71,6 @@ node tests/oj-smoke.cjs
 node tests/chatgpt-smoke.cjs
 ```
 
-测试模拟网页和油猴接口，覆盖六类 OJ 提取、双平台分流、独立开关、网页填入、草稿保护、过期消息、PDF 控件及 API 响应。不会访问真实 AI 服务或产生费用；不代表真实网站或管理器扩展已完成端到端验证。Vjudge 在线 iframe / PDF 下载仍需实际浏览器验证。
+测试模拟网页和油猴接口，覆盖六类 OJ 提取、双平台分流、独立开关、网页填入、草稿替换、过期消息、PDF 控件及 API 响应。不会访问真实 AI 服务或产生费用；不代表真实网站或管理器扩展已完成端到端验证。Vjudge 在线 iframe / PDF 下载仍需实际浏览器验证。
 
 **不要在正式比赛（rated contest）中使用。** 请只在赛后补题、练习时使用，并遵守各平台规定。

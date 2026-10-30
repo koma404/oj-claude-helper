@@ -1,12 +1,12 @@
 // ==UserScript==
 // @name         Contest → Claude / ChatGPT 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      2.0.0
+// @version      2.0.4
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude / ChatGPT（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
-// @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js
-// @downloadURL  https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js
+// @updateURL    https://raw.githubusercontent.com/koma404/oj-claude-helper/main/claude-contest-helper.user.js
+// @downloadURL  https://raw.githubusercontent.com/koma404/oj-claude-helper/main/claude-contest-helper.user.js
 // @match        https://codeforces.com/*
 // @match        https://*.codeforces.com/*
 // @match        https://codeforc.es/*
@@ -51,9 +51,9 @@
     mode: 'web',             // web：填入对应平台网页；api：调用对应平台 API
     autoSend: false,         // web 模式下填入后是否自动点击发送（默认只填入，由你自己按发送）
     openaiApiKey: '',              // api 模式需要
-    openaiModel: 'gpt-4.1',
+    openaiModel: isClaude ? 'claude-opus-5-5' : 'gpt-4.1',
     // web 模式支持 ChatGPT 首页、GPT 首页和项目首页；默认新对话。
-    chatgptUrl: '',
+    chatgptUrl: isClaude ? 'https://claude.ai/project/01a16288-a5b3-710f-8a63-c585da9e1e13' : '',
     maxTokens: 16000,
     tabPos: null,            // 悬浮标签位置（拖动后自动保存）
     vjudgeSidebar: true,     // Vjudge 左侧面板里是否显示按钮
@@ -61,7 +61,7 @@
   const isChatGPTStartUrl = (value) => {
     try {
       const u = new URL(value);
-      return u.origin === 'https://chatgpt.com' && !u.search && !u.hash
+      return u.origin === 'https://chatgpt.com'
         && /^\/(?:g\/[\w-]+(?:\/project)?)?\/?$/.test(u.pathname);
     } catch (_) { return false; }
   };
@@ -71,8 +71,10 @@
     if (isClaude) return ({openaiApiKey:'apiKey', openaiModel:'model', chatgptUrl:'projectUrl'})[k] || k;
     return 'chatgpt_' + k;
   };
-  const cfg = (k) => GM_getValue(storageKey(k), k === 'openaiModel' && isClaude ? 'claude-sonnet-4-6' : DEFAULTS[k]);
+  const cfg = (k) => GM_getValue(storageKey(k), DEFAULTS[k]);
   const saveCfg = (k, v) => GM_setValue(storageKey(k), v);
+  // 原版 Claude 项目地址迁移逻辑。
+  if (isClaude && GM_getValue('projectUrl') === 'https://claude.ai/project/01a11f70-bbd7-727e-9e27-93b81bc5d979') GM_setValue('projectUrl', DEFAULTS.chatgptUrl);
   const PENDING_KEY = isClaude ? 'pendingPrompt' : 'chatgptPendingPrompt';
   const PENDING_TTL = 2 * 60 * 1000;
 
@@ -103,8 +105,33 @@
   // ---------------------------------------------------------------------------
   // 题目页面端
   // ---------------------------------------------------------------------------
-  // 对话气泡图标（SVG），用作 CSS mask，颜色跟随 currentColor
-  const ICON_URL = 'data:image/svg+xml,' + encodeURIComponent('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32"><path fill="black" d="M4 3h24v20H14l-8 6v-6H4z"/></svg>');
+  // Logos: https://github.com/lobehub/lobe-icons (Claude / OpenAI)
+  /*
+   * MIT License
+   *
+   * Copyright (c) 2023 LobeHub
+   *
+   * Permission is hereby granted, free of charge, to any person obtaining a copy
+   * of this software and associated documentation files (the "Software"), to deal
+   * in the Software without restriction, including without limitation the rights
+   * to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+   * copies of the Software, and to permit persons to whom the Software is
+   * furnished to do so, subject to the following conditions:
+   *
+   * The above copyright notice and this permission notice shall be included in all
+   * copies or substantial portions of the Software.
+   *
+   * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+   * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+   * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+   * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+   * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+   * OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+   * SOFTWARE.
+   */
+  const ICON_URL = 'data:image/svg+xml,' + encodeURIComponent(isClaude
+    ? "<svg fill=\"black\" fill-rule=\"evenodd\" height=\"1em\" style=\"flex:none;line-height:1\" viewBox=\"0 0 24 24\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><title>Claude</title><path d=\"M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z\"></path></svg>"
+    : "<svg fill=\"black\" fill-rule=\"evenodd\" height=\"1em\" style=\"flex:none;line-height:1\" viewBox=\"0 0 24 24\" width=\"1em\" xmlns=\"http://www.w3.org/2000/svg\"><title>OpenAI</title><path d=\"M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z\"></path></svg>");
   const isVjudge = location.hostname === 'vjudge.net';
   const HAS_NATIVE_COPY = /^(www\.luogu\.com\.cn|(new)?oj\.daimayuan\.top)$/.test(location.hostname);
 
@@ -161,7 +188,8 @@
     const style = document.createElement('style');
     style.textContent = `
       .cc-icon { display:inline-block; width:1.1em; height:1.1em; flex:none; vertical-align:-0.15em;
-        background-color:currentColor; -webkit-mask:url(${ICON_URL}) center/contain no-repeat; mask:url(${ICON_URL}) center/contain no-repeat; }
+        background-color:currentColor; -webkit-mask-position:center; mask-position:center;
+        -webkit-mask-size:contain; mask-size:contain; -webkit-mask-repeat:no-repeat; mask-repeat:no-repeat; }
       .cc-edge-tab { position:fixed; right:0; top:62%; z-index:2147483646; display:none; align-items:center;
         padding-right:4px; border-radius:999px 0 0 999px; background:#10a37f; color:#fff;
         font:600 14px/1 system-ui, sans-serif; white-space:nowrap; user-select:none; touch-action:none;
@@ -180,7 +208,7 @@
       .cc-edge-tab.cc-snapping { transition:left .22s cubic-bezier(.3,1.4,.6,1), top .22s ease; }
       .cc-edge-tab .cc-handle { display:flex; align-items:center; justify-content:center; width:34px; height:34px; flex:none; cursor:grab; }
       .cc-edge-tab.cc-dragging, .cc-edge-tab.cc-dragging * { cursor:grabbing; }
-      .cc-edge-tab .cc-icon { width:16px; height:16px; }
+      .cc-edge-tab .cc-icon { width:22px; height:22px; pointer-events:none; }
       .cc-edge-tab button { height:26px; margin:4px 0; padding:0 10px; border:none; border-radius:999px;
         background:transparent; color:inherit; font:inherit; cursor:pointer; }
       .cc-edge-tab button:hover { background:rgba(0,0,0,.15); }
@@ -194,6 +222,9 @@
   function createIcon() {
     const i = document.createElement('span');
     i.className = 'cc-icon';
+    // 每个实例独立指定图标，避免两次注入的公共 CSS 互相覆盖。
+    i.style.maskImage = `url("${ICON_URL}")`;
+    i.style.webkitMaskImage = `url("${ICON_URL}")`;
     i.setAttribute('aria-hidden', 'true');
     return i;
   }
@@ -204,13 +235,13 @@
     tab.id = 'cc-edge-tab-' + provider;
     tab.className = 'cc-edge-tab';
     tab.style.backgroundColor = isClaude ? '#d97757' : '#10a37f';
-    tab.style.top = isClaude ? '52%' : '65%';
+    tab.style.top = isClaude ? '62%' : '75%';
     const handle = document.createElement('span');
     handle.className = 'cc-handle';
     handle.title = '点击展开 / 收起，按住拖动可调整位置';
     handle.setAttribute('role', 'button');
     handle.tabIndex = 0;
-    handle.textContent = isClaude ? 'C' : 'G';
+    handle.appendChild(createIcon());
     handle.setAttribute('aria-label', label + ' 悬浮球');
     const toggle = () => tab.classList.toggle('cc-open');
     handle.addEventListener('click', toggle);
@@ -305,7 +336,11 @@
       btn.type = 'button';
       btn.className = 'btn btn-secondary cc-vjudge-btn';
       btn.title = title;
-      if (withIcon) btn.appendChild(createIcon());
+      if (withIcon) {
+        const icon = createIcon();
+        icon.style.color = isClaude ? '#d97757' : '#10a37f';
+        btn.appendChild(icon);
+      }
       btn.appendChild(document.createTextNode(label));
       btn.addEventListener('click', fn);
       col.appendChild(btn);
@@ -368,7 +403,7 @@
     registerProviderMenu('重置悬浮标签位置', () => {
       GM_deleteValue(storageKey('tabPos'));
       edgeTab.classList.remove('cc-left');
-      edgeTab.style.top = isClaude ? '52%' : '65%';
+      edgeTab.style.top = isClaude ? '62%' : '75%';
     });
   }
 
@@ -395,7 +430,7 @@
       return `<${main.tagName.toLowerCase()} id="${main.id}" class="${String(main.className)}">`;
     });
     const text = parts.join('\n') + '\n\n' + html;
-    console.log('[Contest→ChatGPT] 调试信息\n' + text);
+    console.log('[Contest→' + label + '] 调试信息\n' + text);
     showPanel(text);
     toast(await copyText(text) ? '已复制页面信息；也可以在面板里点「复制全部」' : '复制失败，请在面板里手动复制');
   }
@@ -456,14 +491,14 @@
         try {
           pdf = { name: msg.pdfName, data: await fetchPdfBase64(url) };
           if (!msg.pdfUrl) msg.text = msg.text.replace(/题面见 PDF：.*$/, `题面见 PDF：${url}`);
-          console.info('[Contest→ChatGPT] PDF 来自', url);
+          console.info('[Contest→' + label + '] PDF 来自', url);
           break;
         } catch (e) {
           errors.push(`${url} → ${e.message}`);
         }
       }
       if (!pdf) {
-        console.error('[Contest→ChatGPT] PDF 下载失败\n' + errors.join('\n'));
+        console.error('[Contest→' + label + '] PDF 下载失败\n' + errors.join('\n'));
         toast('PDF 下载失败（详情见控制台），只发送标题和链接');
       }
     }
@@ -472,7 +507,7 @@
     } else {
       GM_setValue(PENDING_KEY, { prompt: msg.text, pdf, autoSend: cfg('autoSend'), ts: Date.now() });
       GM_openInTab(isClaude ? (cfg('chatgptUrl') || 'https://claude.ai/new') : (isChatGPTStartUrl(cfg('chatgptUrl')) ? cfg('chatgptUrl') : 'https://chatgpt.com/'), { active: true, insert: true });
-      toast('已打开 ' + label + '，题面已复制；有 PDF 时请确认附件上传');
+      toast(pdf ? '已打开 ' + label + '，PDF 会作为附件上传' : '已打开 ' + label + '（题面也已复制到剪贴板）');
     }
   }
 
@@ -484,7 +519,7 @@
     if (sel.length > 20) {
       problem = { title: document.title, statement: sel };
     } else {
-      try { problem = await extractProblem(); } catch (e) { console.error('[Contest→ChatGPT]', e); }
+      try { problem = await extractProblem(); } catch (e) { console.error('[Contest→' + label + ']', e); }
     }
     if (problem?.pdfUrl) {
       const title = problem.title.trim();
@@ -1021,6 +1056,7 @@
     if (!/^\/(new|project\/[\w-]+\/?$)/.test(location.pathname)) return;
     const data = GM_getValue(PENDING_KEY);
     if (!data || Date.now() - data.ts > PENDING_TTL) return;
+    GM_deleteValue(PENDING_KEY); // 只消费一次，避免其它标签页重复填入
 
     waitFor(() => document.querySelector('div[contenteditable="true"]'), 20000).then(async (editor) => {
       if (!editor) { console.warn('[Contest→Claude] 没找到输入框，提示词已在剪贴板中，可手动粘贴'); return; }
@@ -1029,7 +1065,10 @@
       editor = document.querySelector('div[contenteditable="true"]') || editor;
       editor.focus();
       // claude.ai 会保存未发送的草稿，打开时输入框里可能还有上次的文字，先清空
-      if (editor.textContent.trim()) { toast('已有草稿，未覆盖，请手动粘贴'); return; }
+      if (editor.textContent.trim()) {
+        document.execCommand('selectAll', false);
+        document.execCommand('delete', false);
+      }
       // ProseMirror 能正确处理 insertText；失败则模拟粘贴
       const ok = document.execCommand('insertText', false, data.prompt);
       if (!ok || !editor.textContent.trim()) {
@@ -1037,9 +1076,7 @@
         dt.setData('text/plain', data.prompt);
         editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
       }
-      if (editor.innerText.trim() !== data.prompt.trim()) { toast('自动填入未完成，请从剪贴板粘贴'); return; }
-      GM_deleteValue(PENDING_KEY);
-      if (data.pdf) { attachPdf(editor, data.pdf); toast('请确认 PDF 上传完成后手动发送'); return; }
+      if (data.pdf) attachPdf(editor, data.pdf);
       if (!data.autoSend) return;
       const sendBtn = await waitFor(() => {
         const b = document.querySelector('button[aria-label="Send message"], button[aria-label="Send Message"], button[aria-label="发送消息"]');
@@ -1049,48 +1086,109 @@
     });
   }
 
-  function runOnChatGPT() {
-    if (!isChatGPTStartUrl(location.href)) return;
+  async function runOnChatGPT() {
     const data = GM_getValue(PENDING_KEY);
     if (!data || typeof data.prompt !== 'string' || !Number.isFinite(data.ts)
       || Date.now() - data.ts > PENDING_TTL || data.ts > Date.now()) return;
-    const findEditor = () => document.querySelector('#prompt-textarea[contenteditable="true"], textarea#prompt-textarea, [contenteditable="true"][data-placeholder]');
-    waitFor(findEditor, 30000).then(async (editor) => {
-      if (!editor) { console.warn('[Contest→ChatGPT] 没找到输入框，题面仍保留，可刷新重试或从剪贴板粘贴'); return; }
-      // 等待 React 初始化，避免覆盖现有草稿。
-      await sleep(1000);
-      editor = findEditor();
-      if (!editor || !isChatGPTStartUrl(location.href)) return;
-      const current = editor.tagName === 'TEXTAREA' ? editor.value : editor.textContent;
-      if (current.trim()) { toast('已有草稿，未覆盖。请手动粘贴题面或清空后刷新'); return; }
-      if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
-      editor.focus();
-      if (editor.tagName === 'TEXTAREA') {
-        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(editor, data.prompt);
-        editor.dispatchEvent(new Event('input', { bubbles: true }));
-      } else {
-        document.execCommand('insertText', false, data.prompt);
+    const normalize = (text) => text.replace(/\r\n/g, '\n').trim();
+    const read = (editor) => normalize(editor.tagName === 'TEXTAREA' ? editor.value : editor.innerText);
+    const expected = normalize(data.prompt);
+    const findEditor = () => [...document.querySelectorAll(
+      '#prompt-textarea, .ProseMirror[contenteditable="true"], [contenteditable="true"][data-placeholder]'
+    )].find((el) => (el.tagName === 'TEXTAREA' || el.isContentEditable)
+      && !el.disabled && el.getAttribute('aria-disabled') !== 'true' && el.getClientRects().length);
+    let wrote = false;
+    const deadline = Math.min(data.ts + PENDING_TTL, Date.now() + 90000);
+    try {
+      while (Date.now() < deadline) {
+        if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
+        // 等待登录、SPA 跳转或项目页初始化；已有对话始终不写入。
+        const editor = isChatGPTStartUrl(location.href) ? findEditor() : null;
+        if (!editor) { await sleep(300); continue; }
+        const current = read(editor);
+        if (current && current !== expected && wrote) {
+          toast('填入后内容已被修改，停止重试');
+          return;
+        }
+        if (current !== expected) {
+          editor.focus();
+          // 与原版一致：新对话已有草稿时清空，再填入本次题面。
+          if (editor.tagName !== 'TEXTAREA' && current) {
+            const range = document.createRange();
+            range.selectNodeContents(editor);
+            const selection = window.getSelection();
+            selection.removeAllRanges();
+            selection.addRange(range);
+            document.execCommand('delete', false);
+            if (read(editor)) editor.replaceChildren();
+          }
+          wrote = true;
+          if (editor.tagName === 'TEXTAREA') {
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(editor, data.prompt);
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+          } else {
+            // 优先让编辑器自己的粘贴处理器写入状态；不支持时使用浏览器编辑命令。
+            const dt = new DataTransfer();
+            dt.setData('text/plain', data.prompt);
+            editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+            await sleep(100);
+            if (!read(editor)) {
+              const range = document.createRange();
+              range.selectNodeContents(editor);
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              selection.addRange(range);
+              document.execCommand('insertText', false, data.prompt);
+            }
+            if (!read(editor)) {
+              // execCommand 在部分浏览器不可用；DOM mutation + input 供 ProseMirror 同步。
+              const paragraph = document.createElement('p');
+              data.prompt.split('\n').forEach((line, i) => {
+                if (i) paragraph.appendChild(document.createElement('br'));
+                paragraph.appendChild(document.createTextNode(line));
+              });
+              editor.replaceChildren(paragraph);
+              editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: data.prompt }));
+            }
+          }
+        }
+        // 确认初始化/重新渲染没有清掉题面，再消费待填入数据。
+        await sleep(1000);
+        const stable = isChatGPTStartUrl(location.href) ? findEditor() : null;
+        if (!stable || read(stable) !== expected) continue;
+        if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
+        GM_deleteValue(PENDING_KEY);
+        if (data.pdf) {
+          attachChatGPTPdf(stable, data.pdf);
+        }
+        if (!data.autoSend) return;
+        const sendBtn = await waitFor(() => {
+          const live = findEditor();
+          if (!isChatGPTStartUrl(location.href) || !live || read(live) !== expected) return null;
+          const button = document.querySelector('button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="发送提示"]');
+          return button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' ? button : null;
+        }, 30000);
+        if (sendBtn) sendBtn.click();
+        return;
       }
-      const inserted = editor.tagName === 'TEXTAREA' ? editor.value : editor.innerText;
-      if (inserted.trim() !== data.prompt.trim()) { toast('自动填入未完成，请从剪贴板粘贴'); return; }
-      GM_deleteValue(PENDING_KEY);
-      if (data.pdf) {
-        attachPdf(editor, data.pdf);
-        toast('已尝试添加 PDF，请确认附件上传完成后手动发送');
-        return; // 文件上传结果无法可靠判断，禁止带附件自动发送。
-      }
-      if (!data.autoSend) return;
-      const sendBtn = await waitFor(() => {
-        if (!isChatGPTStartUrl(location.href)) return null;
-        const b = document.querySelector('button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="发送提示"]');
-        return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' ? b : null;
-      }, 15000);
-      if (sendBtn) sendBtn.click();
-    }).catch((e) => console.error('[Contest→ChatGPT]', e));
+      console.warn('[Contest→ChatGPT] 未完成自动填入。请检查登录状态、油猴站点权限，或从剪贴板粘贴。');
+      if (document.body) toast('未完成自动填入，请从剪贴板粘贴；题面已保留');
+    } catch (e) { console.error('[Contest→' + label + ']', e); }
+  }
+
+  // 上传 PDF 附件：模拟粘贴文件（实测在 claude.ai 上有效）。
+  // 不再做“上传成功”检测和换方式重试——附件里不一定显示文件名，检测不可靠，反而会重复上传。
+  function attachPdf(editor, pdf) {
+    const bin = atob(pdf.data);
+    const bytes = new Uint8Array(bin.length);
+    for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+    const dt = new DataTransfer();
+    dt.items.add(new File([bytes], pdf.name || 'problem.pdf', { type: 'application/pdf' }));
+    editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
   }
 
   // 优先使用 ChatGPT 的文件输入控件；没有控件时模拟粘贴。
-  function attachPdf(editor, pdf) {
+  function attachChatGPTPdf(editor, pdf) {
     const bin = atob(pdf.data);
     const bytes = Uint8Array.from(bin, (c) => c.charCodeAt(0));
     const dt = new DataTransfer();

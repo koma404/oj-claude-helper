@@ -17,7 +17,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../claude-c
       const context = await browser.newContext();
       await context.route('**/*', route => route.fulfill({contentType:'text/html; charset=utf-8',body:fixture.html}));
       await context.addInitScript(() => {
-        window.saved={}; window.copied=''; window.opened=[]; window.menus=[];
+        window.saved={projectUrl:'https://claude.ai/project/01a11f70-bbd7-727e-9e27-93b81bc5d979'}; window.copied=''; window.opened=[]; window.menus=[];
         window.GM_getValue=(k,d)=> k in saved ? saved[k] : d;
         window.GM_setValue=(k,v)=>saved[k]=v;
         window.GM_deleteValue=k=>delete saved[k];
@@ -56,7 +56,7 @@ const source = fs.readFileSync(require('node:path').join(__dirname, '../claude-c
       await page.getByRole('button',{name:'问 Claude',exact:true}).click();
       await page.waitForFunction(()=>opened.length===2);
       assert.equal(await page.evaluate(()=>saved.pendingPrompt.prompt),copied);
-      assert.equal(await page.evaluate(()=>opened[1]),'https://claude.ai/new');
+      assert.equal(await page.evaluate(()=>opened[1]),'https://claude.ai/project/01a16288-a5b3-710f-8a63-c585da9e1e13');
       await page.evaluate(()=>menus.find(m=>m.name.startsWith('[ChatGPT] 悬浮球')).callback());
       assert.equal(await page.locator('#cc-edge-tab-chatgpt').isVisible(),false);
       assert.equal(await page.locator('#cc-edge-tab-claude').isVisible(),true);
