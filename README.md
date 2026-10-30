@@ -6,11 +6,11 @@
 
 先安装 Tampermonkey 或 Violentmonkey，再打开 [安装脚本](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js)。
 
-为保留原有更新路径，脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。当前版本为 2.0.1，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
+为保留原有更新路径，脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。当前版本为 2.0.2，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
 
 ## 两个悬浮球与独立开关
 
-题目页面右侧默认显示两个入口：橙色 **C（Claude）** 和绿色 **G（ChatGPT）**。点击展开按钮，拖动可调整位置；两者分别记忆位置。非题目页面不显示。Vjudge 有侧栏时分别显示在侧栏。
+题目页面右侧默认显示两个入口：橙色 **Claude Logo** 和绿色 **ChatGPT Logo**。点击展开按钮，拖动可调整位置；两者分别记忆位置。非题目页面不显示。Vjudge 有侧栏时分别显示在侧栏。
 
 油猴菜单按 `[Claude]`、`[ChatGPT]` 分组，各有独立的「悬浮球：开 / 关」开关，点击立即生效。关闭后对应快捷键也停用；两者可以都开、只开一个或都关。菜单状态文字刷新页面后更新。
 
