@@ -1,7 +1,7 @@
 // ==UserScript==
 // @name         Contest → Claude / ChatGPT 一键解题
 // @namespace    https://github.com/koma404/claude-workspace
-// @version      2.0.0
+// @version      2.0.1
 // @description  在 Codeforces / AtCoder / 洛谷 / LeetCode / Vjudge / 代码源（新旧 OJ） 题目页面一键提取题面，发送给 Claude / ChatGPT（网页版或 API）
 // @author       koma404
 // @homepageURL  https://github.com/koma404/oj-claude-helper
@@ -61,7 +61,7 @@
   const isChatGPTStartUrl = (value) => {
     try {
       const u = new URL(value);
-      return u.origin === 'https://chatgpt.com' && !u.search && !u.hash
+      return u.origin === 'https://chatgpt.com'
         && /^\/(?:g\/[\w-]+(?:\/project)?)?\/?$/.test(u.pathname);
     } catch (_) { return false; }
   };
@@ -1049,44 +1049,86 @@
     });
   }
 
-  function runOnChatGPT() {
-    if (!isChatGPTStartUrl(location.href)) return;
+  async function runOnChatGPT() {
     const data = GM_getValue(PENDING_KEY);
     if (!data || typeof data.prompt !== 'string' || !Number.isFinite(data.ts)
       || Date.now() - data.ts > PENDING_TTL || data.ts > Date.now()) return;
-    const findEditor = () => document.querySelector('#prompt-textarea[contenteditable="true"], textarea#prompt-textarea, [contenteditable="true"][data-placeholder]');
-    waitFor(findEditor, 30000).then(async (editor) => {
-      if (!editor) { console.warn('[Contest→ChatGPT] 没找到输入框，题面仍保留，可刷新重试或从剪贴板粘贴'); return; }
-      // 等待 React 初始化，避免覆盖现有草稿。
-      await sleep(1000);
-      editor = findEditor();
-      if (!editor || !isChatGPTStartUrl(location.href)) return;
-      const current = editor.tagName === 'TEXTAREA' ? editor.value : editor.textContent;
-      if (current.trim()) { toast('已有草稿，未覆盖。请手动粘贴题面或清空后刷新'); return; }
-      if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
-      editor.focus();
-      if (editor.tagName === 'TEXTAREA') {
-        Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(editor, data.prompt);
-        editor.dispatchEvent(new Event('input', { bubbles: true }));
-      } else {
-        document.execCommand('insertText', false, data.prompt);
+    const normalize = (text) => text.replace(/\r\n/g, '\n').trim();
+    const read = (editor) => normalize(editor.tagName === 'TEXTAREA' ? editor.value : editor.innerText);
+    const expected = normalize(data.prompt);
+    const findEditor = () => [...document.querySelectorAll(
+      '#prompt-textarea, .ProseMirror[contenteditable="true"], [contenteditable="true"][data-placeholder]'
+    )].find((el) => (el.tagName === 'TEXTAREA' || el.isContentEditable)
+      && !el.disabled && el.getAttribute('aria-disabled') !== 'true' && el.getClientRects().length);
+    let warnedDraft = false;
+    const deadline = Math.min(data.ts + PENDING_TTL, Date.now() + 90000);
+    try {
+      while (Date.now() < deadline) {
+        if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
+        // 等待登录、SPA 跳转或项目页初始化；已有对话始终不写入。
+        const editor = isChatGPTStartUrl(location.href) ? findEditor() : null;
+        if (!editor) { await sleep(300); continue; }
+        const current = read(editor);
+        if (current && current !== expected) {
+          if (!warnedDraft) { toast('已有草稿，未覆盖；清空输入框后会重试填入'); warnedDraft = true; }
+          await sleep(300);
+          continue;
+        }
+        if (!current) {
+          editor.focus();
+          if (editor.tagName === 'TEXTAREA') {
+            Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value').set.call(editor, data.prompt);
+            editor.dispatchEvent(new Event('input', { bubbles: true }));
+          } else {
+            // 优先让编辑器自己的粘贴处理器写入状态；不支持时使用浏览器编辑命令。
+            const dt = new DataTransfer();
+            dt.setData('text/plain', data.prompt);
+            editor.dispatchEvent(new ClipboardEvent('paste', { clipboardData: dt, bubbles: true, cancelable: true }));
+            await sleep(100);
+            if (!read(editor)) {
+              const range = document.createRange();
+              range.selectNodeContents(editor);
+              const selection = window.getSelection();
+              selection.removeAllRanges();
+              selection.addRange(range);
+              document.execCommand('insertText', false, data.prompt);
+            }
+            if (!read(editor)) {
+              // execCommand 在部分浏览器不可用；DOM mutation + input 供 ProseMirror 同步。
+              const paragraph = document.createElement('p');
+              data.prompt.split('\n').forEach((line, i) => {
+                if (i) paragraph.appendChild(document.createElement('br'));
+                paragraph.appendChild(document.createTextNode(line));
+              });
+              editor.replaceChildren(paragraph);
+              editor.dispatchEvent(new InputEvent('input', { bubbles: true, inputType: 'insertText', data: data.prompt }));
+            }
+          }
+        }
+        // 确认初始化/重新渲染没有清掉题面，再消费待填入数据。
+        await sleep(1000);
+        const stable = isChatGPTStartUrl(location.href) ? findEditor() : null;
+        if (!stable || read(stable) !== expected) continue;
+        if (GM_getValue(PENDING_KEY)?.ts !== data.ts) return;
+        GM_deleteValue(PENDING_KEY);
+        if (data.pdf) {
+          attachPdf(stable, data.pdf);
+          toast('已尝试添加 PDF，请确认附件上传完成后手动发送');
+          return;
+        }
+        if (!data.autoSend) return;
+        const sendBtn = await waitFor(() => {
+          const live = findEditor();
+          if (!isChatGPTStartUrl(location.href) || !live || read(live) !== expected) return null;
+          const button = document.querySelector('button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="发送提示"]');
+          return button && !button.disabled && button.getAttribute('aria-disabled') !== 'true' ? button : null;
+        }, 15000);
+        if (sendBtn) sendBtn.click();
+        return;
       }
-      const inserted = editor.tagName === 'TEXTAREA' ? editor.value : editor.innerText;
-      if (inserted.trim() !== data.prompt.trim()) { toast('自动填入未完成，请从剪贴板粘贴'); return; }
-      GM_deleteValue(PENDING_KEY);
-      if (data.pdf) {
-        attachPdf(editor, data.pdf);
-        toast('已尝试添加 PDF，请确认附件上传完成后手动发送');
-        return; // 文件上传结果无法可靠判断，禁止带附件自动发送。
-      }
-      if (!data.autoSend) return;
-      const sendBtn = await waitFor(() => {
-        if (!isChatGPTStartUrl(location.href)) return null;
-        const b = document.querySelector('button[data-testid="send-button"], button[aria-label="Send prompt"], button[aria-label="发送提示"]');
-        return b && !b.disabled && b.getAttribute('aria-disabled') !== 'true' ? b : null;
-      }, 15000);
-      if (sendBtn) sendBtn.click();
-    }).catch((e) => console.error('[Contest→ChatGPT]', e));
+      console.warn('[Contest→ChatGPT] 未完成自动填入。请检查登录状态、油猴站点权限，或从剪贴板粘贴。');
+      if (document.body) toast('未完成自动填入，请从剪贴板粘贴；题面已保留');
+    } catch (e) { console.error('[Contest→ChatGPT]', e); }
   }
 
   // 优先使用 ChatGPT 的文件输入控件；没有控件时模拟粘贴。

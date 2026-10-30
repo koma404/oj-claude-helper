@@ -6,7 +6,7 @@
 
 先安装 Tampermonkey 或 Violentmonkey，再打开 [安装脚本](https://raw.githubusercontent.com/koma404/oj-claude-helper/HEAD/claude-contest-helper.user.js)。
 
-为保留原有更新路径，脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。版本升级至 2.0.0，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
+为保留原有更新路径，脚本文件名仍为 `claude-contest-helper.user.js`，namespace 保持不变。当前版本为 2.0.1，保留已有 Claude 密钥、项目、模式、位置等设置；ChatGPT 设置独立存储，不会使用 Claude 的密钥。升级后若管理器同时保留了旧版本，请禁用旧版本，避免重复按钮。
 
 ## 两个悬浮球与独立开关
 
@@ -27,7 +27,7 @@
 - Claude：留空打开 `https://claude.ai/new`，也可配置 `https://claude.ai/project/<ID>`。
 - ChatGPT：留空打开 `https://chatgpt.com/`，也可配置 GPT 首页 `/g/<ID>` 或项目首页 `/g/<ID>/project`。
 
-需要在自己的浏览器登录对应账号。脚本只传题目标题、链接、题面，不附加解题提示词；项目或 GPT 的自定义指令由用户配置。题面同时复制到剪贴板，自动填入失败时可手动粘贴。已有草稿不会被覆盖；清空后刷新可在两分钟有效期内重试。
+需要在自己的浏览器登录对应账号。脚本只传题目标题、链接、题面，不附加解题提示词；项目或 GPT 的自定义指令由用户配置。题面同时复制到剪贴板，自动填入失败时可手动粘贴。已有草稿不会被覆盖；ChatGPT 在等待期间清空输入框即可重试。待填入数据有效期两分钟，ChatGPT 最多等待 90 秒，支持带模型/临时聊天参数的首页和登录后的页面跳转；编辑器重新渲染时会重试。
 
 默认填入后由用户检查并手动发送。两个平台分别有「网页版自动发送」选项；带 PDF 时始终要求手动确认附件上传后发送。网页结构变化可能影响自动填入或附件上传，页面已有对话不会接收新题面。
 

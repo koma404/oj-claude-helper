@@ -11,6 +11,11 @@ const source = fs.readFileSync(path.join(__dirname, '../claude-contest-helper.us
       {name:'contenteditable default, no send',url:'https://chatgpt.com/'},
       {name:'textarea GPT, opt-in send',url:'https://chatgpt.com/g/g-example',textarea:true,autoSend:true},
       {name:'project PDF, no automatic send',url:'https://chatgpt.com/g/g-p-example/project',pdf:true,autoSend:true},
+      {name:'homepage model query',url:'https://chatgpt.com/?model=gpt-4.1'},
+      {name:'temporary chat query',url:'https://chatgpt.com/?temporary-chat=true'},
+      {name:'editor rerender retry',url:'https://chatgpt.com/',rerender:true},
+      {name:'execCommand unavailable, multiline fallback',url:'https://chatgpt.com/',noExec:true,multiline:true},
+      {name:'delayed editor after SPA redirect',url:'https://chatgpt.com/auth/login',redirect:true},
       {name:'preserve draft',url:'https://chatgpt.com/',draft:'my draft'},
       {name:'ignore existing conversation',url:'https://chatgpt.com/c/existing',ignore:true},
       {name:'ignore expired handoff',url:'https://chatgpt.com/',expired:true,ignore:true},
@@ -19,10 +24,20 @@ const source = fs.readFileSync(path.join(__dirname, '../claude-contest-helper.us
       await c.route('**/*',r=>r.fulfill({contentType:'text/html; charset=utf-8',body:`${scenario.textarea?'<textarea id="prompt-textarea"></textarea>':`<div id="prompt-textarea" contenteditable="true">${scenario.draft||''}</div>`}<input type="file" accept=".pdf"><button data-testid="send-button" onclick="window.sends++">Send</button>`}));
       await c.addInitScript(s=>{
         window.sends=0; window.uploads=0;
-        window.saved={[s.claude?'pendingPrompt':'chatgptPendingPrompt']:{prompt:'Solve a + b.',ts:Date.now()-(s.expired?180000:0),autoSend:!!s.autoSend,...(s.pdf?{pdf:{name:'problem.pdf',data:btoa('%PDF-1.4 fixture')}}:{})}};
+        window.saved={[s.claude?'pendingPrompt':'chatgptPendingPrompt']:{prompt:s.multiline?'# Sum\n\nCompute a + b.\nExample: 1 2': 'Solve a + b.',ts:Date.now()-(s.expired?180000:0),autoSend:!!s.autoSend,...(s.pdf?{pdf:{name:'problem.pdf',data:btoa('%PDF-1.4 fixture')}}:{})}};
         window.GM_getValue=(k,d)=>k in saved?saved[k]:d;
         window.GM_setValue=(k,v)=>saved[k]=v;
         window.GM_deleteValue=k=>delete saved[k];
+        if(s.noExec) document.execCommand=()=>false;
+        document.addEventListener('DOMContentLoaded',()=>{
+          if(s.rerender) document.querySelector('#prompt-textarea').addEventListener('input',e=>{
+            const fresh=e.target.cloneNode(false);e.target.replaceWith(fresh);
+          },{once:true});
+          if(s.redirect) {
+            const editor=document.querySelector('#prompt-textarea');editor.remove();
+            setTimeout(()=>{history.replaceState({},'', '/?model=gpt-4.1');document.body.prepend(editor)},500);
+          }
+        });
         document.addEventListener('change',e=>{if(e.target.type==='file')window.uploads++});
       },scenario);
       await c.addInitScript({content:source});
@@ -31,8 +46,8 @@ const source = fs.readFileSync(path.join(__dirname, '../claude-contest-helper.us
       if(scenario.ignore||scenario.draft) await p.waitForTimeout(1800);
       else await p.waitForFunction(()=>!saved.chatgptPendingPrompt&&!saved.pendingPrompt);
       if(scenario.autoSend&&!scenario.pdf) await p.waitForFunction(()=>sends===1);
-      const result=await p.evaluate(()=>({text:document.querySelector('#prompt-textarea').value??document.querySelector('#prompt-textarea').textContent,pending:!!(saved.chatgptPendingPrompt||saved.pendingPrompt),sends,uploads,file:document.querySelector('input').files[0]?.name}));
-      assert.equal(result.text,scenario.draft|| (scenario.ignore?'':'Solve a + b.'));
+      const result=await p.evaluate(()=>({text:document.querySelector('#prompt-textarea').value??document.querySelector('#prompt-textarea').innerText,pending:!!(saved.chatgptPendingPrompt||saved.pendingPrompt),sends,uploads,file:document.querySelector('input').files[0]?.name}));
+      assert.equal(result.text,scenario.draft|| (scenario.ignore?'':scenario.multiline?'# Sum\n\nCompute a + b.\nExample: 1 2':'Solve a + b.'));
       assert.equal(result.pending,!!(scenario.ignore||scenario.draft));
       assert.equal(result.sends,scenario.autoSend&&!scenario.pdf?1:0);
       if(scenario.pdf){assert.equal(result.uploads,1);assert.equal(result.file,'problem.pdf')}
